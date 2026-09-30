@@ -5,5 +5,10 @@ node_modules/
 .env
 .env.*
 
+# SQLite database (generated at runtime by src/database.js)
+*.db
+*.db-journal
+
 # Logs
+*.log
 npm-debug.log*

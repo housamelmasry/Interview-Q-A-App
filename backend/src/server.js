@@ -1,12 +1,25 @@
 import express from "express";
 import cors from "cors";
-import db from "./database.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import swaggerUi from "swagger-ui-express";
+import db, { ready } from "./database.js";
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Interactive API documentation (OpenAPI 3 spec -> Swagger UI)
+const openapiSpec = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "openapi.json"), "utf8"),
+);
+app.get("/api/openapi.json", (_req, res) => res.json(openapiSpec));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec, { explorer: true }));
 
 // API Routes
 
@@ -114,6 +127,32 @@ app.post("/api/categories", (req, res) => {
   );
 });
 
+// Update category
+app.put("/api/categories/:id", (req, res) => {
+  const { id } = req.params;
+  const { label, icon, color } = req.body;
+
+  if (!label) {
+    return res.status(400).json({ error: "Category label is required" });
+  }
+
+  db.run(
+    "UPDATE categories SET label = ?, icon = ?, color = ? WHERE id = ?",
+    [label, icon || "", color || "#666666", id],
+    function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(404).json({ error: "Category not found" });
+        return;
+      }
+      res.json({ message: "Category updated successfully" });
+    },
+  );
+});
+
 // Add new question (with optional answers)
 app.post("/api/questions", (req, res) => {
   const { category_id, question_text, answers } = req.body;
@@ -168,6 +207,12 @@ app.post("/api/questions", (req, res) => {
 app.put("/api/questions/:id", (req, res) => {
   const { id } = req.params;
   const { question_text, category_id, answers } = req.body;
+
+  if (!question_text || !category_id) {
+    return res
+      .status(400)
+      .json({ error: "Category ID and question text are required" });
+  }
 
   db.serialize(() => {
     db.run("BEGIN TRANSACTION");
@@ -289,10 +334,23 @@ app.delete("/api/answers/:id", (req, res) => {
   });
 });
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({ status: "OK" });
 });
 
-app.listen(3000, () => {
-  console.log("Backend running on port 3000");
-});
+// Only bind a port when this file is executed directly. The test suite imports
+// `app` and drives it in-process, so it must not start a listener.
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  const port = Number(process.env.PORT) || 3000;
+  // Never accept requests before the schema exists.
+  await ready;
+  app.listen(port, () => {
+    console.log(`Backend running on port ${port}`);
+    console.log(`API docs available at http://localhost:${port}/api/docs`);
+  });
+}
+
+export default app;

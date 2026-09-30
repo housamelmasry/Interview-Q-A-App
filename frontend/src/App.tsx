@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 
-interface Category {
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+export interface Category {
   id: string;
   label: string;
   icon: string;
   color: string;
 }
 
-interface Question {
+export interface Question {
   id: number;
   question_text: string;
   category_id: string;
@@ -16,13 +18,13 @@ interface Question {
   color: string;
 }
 
-interface Answer {
+export interface Answer {
   id: number;
   question_id: number;
   answer_text: string;
 }
 
-interface QuestionWithAnswers extends Question {
+export interface QuestionWithAnswers extends Question {
   answers: Answer[];
 }
 
@@ -52,31 +54,42 @@ export default function InterviewGuide() {
       setError(null);
 
       // Fetch categories
-      const categoriesResponse = await fetch(
-        "http://localhost:3000/api/categories",
-      );
+      const categoriesResponse = await fetch(`${API_URL}/api/categories`);
       if (!categoriesResponse.ok)
         throw new Error("Failed to fetch categories");
       const categoriesData = await categoriesResponse.json();
       setCategories(categoriesData);
 
-      // Fetch questions (now including answers from backend)
-      const questionsResponse = await fetch(
-        "http://localhost:3000/api/questions",
+      // Keep the selected tab valid: fall back to the first category when the
+      // default one no longer exists (e.g. it was deleted in manage mode).
+      setActiveCategory((current) =>
+        categoriesData.some((c: Category) => c.id === current)
+          ? current
+          : (categoriesData[0]?.id ?? ""),
       );
+
+      // Fetch questions (now including answers from backend)
+      const questionsResponse = await fetch(`${API_URL}/api/questions`);
       if (!questionsResponse.ok) throw new Error("Failed to fetch questions");
       const questionsData = await questionsResponse.json();
 
       setQuestions(questionsData);
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load data. Is the API running?",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Loading data from the API on mount is a legitimate effect: the request
+    // is an external subscription, and the setState calls happen inside it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, []);
 
@@ -85,34 +98,54 @@ export default function InterviewGuide() {
     if (!editingCategory) return;
 
     try {
-      const isNew = !categories.find(c => c.id === editingCategory.id);
-      const url = isNew 
-        ? "http://localhost:3000/api/categories" 
-        : `http://localhost:3000/api/categories/${editingCategory.id}`;
-      
+      const isNew = !categories.find((c) => c.id === editingCategory.id);
+      const url = isNew
+        ? `${API_URL}/api/categories`
+        : `${API_URL}/api/categories/${editingCategory.id}`;
+
       const response = await fetch(url, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingCategory),
       });
 
-      if (response.ok) {
-        setShowCategoryForm(false);
-        setEditingCategory(null);
-        fetchData();
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error ?? `Failed to save category (${response.status})`);
+        return;
       }
+
+      setShowCategoryForm(false);
+      setEditingCategory(null);
+      setError(null);
+      fetchData();
     } catch (err) {
-      alert("Error saving category");
+      console.error("Error saving category:", err);
+      setError("Error saving category. Is the API running?");
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm("Are you sure? This will not delete questions but they will be uncategorized.")) return;
+    if (
+      !confirm(
+        "Delete this category? Every question inside it and all of their answers will be permanently deleted.",
+      )
+    )
+      return;
     try {
-      await fetch(`http://localhost:3000/api/categories/${id}`, { method: "DELETE" });
+      const response = await fetch(`${API_URL}/api/categories/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error ?? `Failed to delete category (${response.status})`);
+        return;
+      }
+      setError(null);
       fetchData();
     } catch (err) {
-      alert("Error deleting category");
+      console.error("Error deleting category:", err);
+      setError("Error deleting category. Is the API running?");
     }
   };
 
@@ -122,10 +155,10 @@ export default function InterviewGuide() {
 
     try {
       const isNew = !editingQuestion.id;
-      const url = isNew 
-        ? "http://localhost:3000/api/questions" 
-        : `http://localhost:3000/api/questions/${editingQuestion.id}`;
-      
+      const url = isNew
+        ? `${API_URL}/api/questions`
+        : `${API_URL}/api/questions/${editingQuestion.id}`;
+
       const response = await fetch(url, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
@@ -135,23 +168,38 @@ export default function InterviewGuide() {
         }),
       });
 
-      if (response.ok) {
-        setShowQuestionForm(false);
-        setEditingQuestion(null);
-        fetchData();
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error ?? `Failed to save question (${response.status})`);
+        return;
       }
+
+      setShowQuestionForm(false);
+      setEditingQuestion(null);
+      setError(null);
+      fetchData();
     } catch (err) {
-      alert("Error saving question");
+      console.error("Error saving question:", err);
+      setError("Error saving question. Is the API running?");
     }
   };
 
   const handleDeleteQuestion = async (id: number) => {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Delete this question and its answers?")) return;
     try {
-      await fetch(`http://localhost:3000/api/questions/${id}`, { method: "DELETE" });
+      const response = await fetch(`${API_URL}/api/questions/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error ?? `Failed to delete question (${response.status})`);
+        return;
+      }
+      setError(null);
       fetchData();
     } catch (err) {
-      alert("Error deleting question");
+      console.error("Error deleting question:", err);
+      setError("Error deleting question. Is the API running?");
     }
   };
 
@@ -424,8 +472,9 @@ export default function InterviewGuide() {
               <form onSubmit={handleSaveCategory}>
                 <h2 style={{ marginTop: 0 }}>{categories.find(c => c.id === editingCategory.id) ? "تعديل تصنيف" : "تصنيف جديد"}</h2>
                 <div style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem" }}>المعرف (ID):</label>
-                  <input 
+                  <label htmlFor="category-id" id="category-id-label" style={{ display: "block", marginBottom: "0.5rem" }}>المعرف (ID):</label>
+                  <input
+                    id="category-id"
                     value={editingCategory.id} 
                     onChange={e => setEditingCategory({...editingCategory, id: e.target.value})}
                     style={{ width: "100%", padding: "0.5rem", background: theme.cardBg, border: `1px solid ${theme.border}`, color: theme.text, borderRadius: "4px" }}
@@ -433,8 +482,9 @@ export default function InterviewGuide() {
                   />
                 </div>
                 <div style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem" }}>الاسم:</label>
-                  <input 
+                  <label htmlFor="category-label" id="category-label-label" style={{ display: "block", marginBottom: "0.5rem" }}>الاسم:</label>
+                  <input
+                    id="category-label"
                     value={editingCategory.label} 
                     onChange={e => setEditingCategory({...editingCategory, label: e.target.value})}
                     style={{ width: "100%", padding: "0.5rem", background: theme.cardBg, border: `1px solid ${theme.border}`, color: theme.text, borderRadius: "4px" }}
@@ -442,7 +492,7 @@ export default function InterviewGuide() {
                 </div>
                 <div style={{ marginBottom: "1rem", display: "flex", gap: "1rem" }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem" }}>الأيقونة:</label>
+                    <label htmlFor="category-icon" id="category-icon-label" style={{ display: "block", marginBottom: "0.5rem" }}>الأيقونة:</label>
                     <input 
                       value={editingCategory.icon} 
                       onChange={e => setEditingCategory({...editingCategory, icon: e.target.value})}
@@ -450,8 +500,9 @@ export default function InterviewGuide() {
                     />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem" }}>اللون:</label>
-                    <input 
+                    <label htmlFor="category-color" id="category-color-label" style={{ display: "block", marginBottom: "0.5rem" }}>اللون:</label>
+                    <input
+                      id="category-color"
                       type="color"
                       value={editingCategory.color} 
                       onChange={e => setEditingCategory({...editingCategory, color: e.target.value})}
@@ -470,8 +521,9 @@ export default function InterviewGuide() {
               <form onSubmit={handleSaveQuestion}>
                 <h2 style={{ marginTop: 0 }}>{editingQuestion.id ? "تعديل سؤال" : "سؤال جديد"}</h2>
                 <div style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem" }}>التصنيف:</label>
-                  <select 
+                  <label htmlFor="question-category" id="question-category-label" style={{ display: "block", marginBottom: "0.5rem" }}>التصنيف:</label>
+                  <select
+                    id="question-category"
                     value={editingQuestion.category_id}
                     onChange={e => setEditingQuestion({...editingQuestion, category_id: e.target.value})}
                     style={{ width: "100%", padding: "0.5rem", background: theme.cardBg, border: `1px solid ${theme.border}`, color: theme.text, borderRadius: "4px" }}
@@ -480,15 +532,16 @@ export default function InterviewGuide() {
                   </select>
                 </div>
                 <div style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem" }}>السؤال:</label>
-                  <textarea 
+                  <label htmlFor="question-text" id="question-text-label" style={{ display: "block", marginBottom: "0.5rem" }}>السؤال:</label>
+                  <textarea
+                    id="question-text"
                     value={editingQuestion.question_text} 
                     onChange={e => setEditingQuestion({...editingQuestion, question_text: e.target.value})}
                     style={{ width: "100%", padding: "0.5rem", background: theme.cardBg, border: `1px solid ${theme.border}`, color: theme.text, borderRadius: "4px", minHeight: "80px" }}
                   />
                 </div>
                 <div style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem" }}>الإجابات:</label>
+                  <label htmlFor="question-answers" id="question-answers-label" style={{ display: "block", marginBottom: "0.5rem" }}>الإجابات:</label>
                   {editingQuestion.answers?.map((ans, idx) => (
                     <div key={ans.id} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
                       <textarea 
@@ -530,6 +583,59 @@ export default function InterviewGuide() {
               </form>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            margin: "1rem 1.5rem 0",
+            padding: "0.85rem 1.1rem",
+            borderRadius: "8px",
+            border: `1px solid ${isDarkMode ? "#7f1d1d" : "#fca5a5"}`,
+            background: isDarkMode ? "#2a1414" : "#fef2f2",
+            color: isDarkMode ? "#fca5a5" : "#991b1b",
+            fontSize: "0.9rem",
+            maxWidth: "860px",
+            marginInline: "auto",
+          }}
+        >
+          <span aria-hidden="true">⚠️</span>
+          <span style={{ flex: 1 }}>{error}</span>
+          <button
+            onClick={fetchData}
+            style={{
+              background: "transparent",
+              border: "1px solid currentColor",
+              color: "inherit",
+              borderRadius: "4px",
+              padding: "0.2rem 0.6rem",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: "0.8rem",
+            }}
+          >
+            إعادة المحاولة
+          </button>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              fontSize: "1rem",
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
 

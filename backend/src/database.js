@@ -6,7 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Create database path
-const dbPath = path.join(__dirname, "interview_guide.db");
+// DB_PATH lets the test suite point at a throwaway database file so that
+// running tests never touches the local development database.
+const dbPath = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(__dirname, "interview_guide.db");
 
 // Create database connection
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -17,6 +21,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
     db.run("PRAGMA foreign_keys = ON;");
     initializeDatabase();
   }
+});
+
+// Resolves once the schema exists and starter categories have been checked.
+// The test suite and the server bootstrap both await this so no request can
+// arrive before the tables are ready.
+let resolveReady;
+export const ready = new Promise((resolve) => {
+  resolveReady = resolve;
 });
 
 // Initialize database tables
@@ -136,12 +148,22 @@ function insertInitialData() {
       categories.forEach((cat) => {
         stmt.run(cat.id, cat.label, cat.icon, cat.color);
       });
-      stmt.finalize();
 
-      console.log("Initial categories inserted.");
-      // Note: In a real app, you'd also insert questions and answers here
-      // For now, we'll add them through the API
+      console.log("Inserting initial categories...");
+      // Resolve only once the prepared statement has actually been flushed,
+      // otherwise callers awaiting `ready` can observe a partially seeded table.
+      stmt.finalize((err) => {
+        if (err) {
+          console.error("Error inserting initial categories:", err);
+        } else {
+          console.log("Initial categories inserted.");
+        }
+        resolveReady(db);
+      });
+      return;
     }
+
+    resolveReady(db);
   });
 }
 

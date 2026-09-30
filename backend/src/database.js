@@ -1,11 +1,13 @@
 import sqlite3 from "sqlite3";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { runMigrations } from "./db/migrate.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create database path
+// Create database path.
 // DB_PATH lets the test suite point at a throwaway database file so that
 // running tests never touches the local development database.
 const dbPath = process.env.DB_PATH
@@ -13,158 +15,84 @@ const dbPath = process.env.DB_PATH
   : path.join(__dirname, "interview_guide.db");
 
 // Create database connection
-const db = new sqlite3.Database(dbPath, (err) => {
+const db = new sqlite3.Database(dbPath, async (err) => {
   if (err) {
     console.error("Error opening database:", err.message);
-  } else {
-    console.log("Connected to SQLite database.");
-    db.run("PRAGMA foreign_keys = ON;");
-    initializeDatabase();
+    process.exit(1);
   }
+  console.log("Connected to SQLite database.");
+
+  // SQLite disables foreign key enforcement per connection, so it must be
+  // switched on explicitly or ON DELETE CASCADE silently does nothing.
+  await new Promise((resolve, reject) =>
+    db.run("PRAGMA foreign_keys = ON;", (e) => (e ? reject(e) : resolve())),
+  );
+
+  try {
+    await runMigrations(db);
+    await bootstrapCategories();
+  } catch (migrationError) {
+    console.error("Database setup failed:", migrationError.message);
+    process.exit(1);
+  }
+
+  resolveReady(db);
 });
 
-// Resolves once the schema exists and starter categories have been checked.
-// The test suite and the server bootstrap both await this so no request can
-// arrive before the tables are ready.
+/**
+ * Resolves once migrations have run and the starter categories are in place.
+ * The test suite and the server bootstrap both await this, so no request can
+ * arrive before the schema is usable.
+ */
 let resolveReady;
 export const ready = new Promise((resolve) => {
   resolveReady = resolve;
 });
 
-// Initialize database tables
-function initializeDatabase() {
-  // Create categories table
-  db.run(
-    `
-    CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
-      label TEXT NOT NULL,
-      icon TEXT,
-      color TEXT
-    )
-  `,
-    (err) => {
-      if (err) {
-        console.error("Error creating categories table:", err);
-        return;
-      }
-
-      // Create questions table
-      db.run(
-        `
-      CREATE TABLE IF NOT EXISTS questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category_id TEXT NOT NULL,
-        question_text TEXT NOT NULL,
-        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
-      )
-    `,
-        (err) => {
-          if (err) {
-            console.error("Error creating questions table:", err);
-            return;
-          }
-
-          // Create answers table
-          db.run(
-            `
-        CREATE TABLE IF NOT EXISTS answers (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          question_id INTEGER NOT NULL,
-          answer_text TEXT NOT NULL,
-          FOREIGN KEY (question_id) REFERENCES questions (id) ON DELETE CASCADE
-        )
-      `,
-            (err) => {
-              if (err) {
-                console.error("Error creating answers table:", err);
-                return;
-              }
-
-              // Insert initial data only after tables are created
-              insertInitialData();
-            },
-          );
-        },
-      );
-    },
-  );
-}
-
-function insertInitialData() {
-  // Check if data already exists
-  db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
-    if (err) {
-      console.error("Error checking categories:", err);
-      return;
-    }
-
-    if (row.count === 0) {
-      // Insert categories
-      const categories = [
-        {
-          id: "laravel-core",
-          label: "Laravel Core",
-          icon: "🔴",
-          color: "#FF4444",
-        },
-        {
-          id: "laravel-advanced",
-          label: "Laravel Advanced",
-          icon: "🟠",
-          color: "#FF8C00",
-        },
-        {
-          id: "backend-general",
-          label: "Backend عام",
-          icon: "🟢",
-          color: "#00C853",
-        },
-        {
-          id: "system-design",
-          label: "System Design",
-          icon: "🔵",
-          color: "#2979FF",
-        },
-        { id: "nodejs", label: "Node.js", icon: "🟡", color: "#F7DF1E" },
-        { id: "react", label: "React", icon: "⚛️", color: "#61DAFB" },
-        {
-          id: "react-native",
-          label: "React Native",
-          icon: "📱",
-          color: "#00D8FF",
-        },
-        {
-          id: "testing",
-          label: "Testing & Security",
-          icon: "🟣",
-          color: "#AA00FF",
-        },
-      ];
-
-      const stmt = db.prepare(
-        "INSERT INTO categories (id, label, icon, color) VALUES (?, ?, ?, ?)",
-      );
-      categories.forEach((cat) => {
-        stmt.run(cat.id, cat.label, cat.icon, cat.color);
-      });
-
-      console.log("Inserting initial categories...");
-      // Resolve only once the prepared statement has actually been flushed,
-      // otherwise callers awaiting `ready` can observe a partially seeded table.
-      stmt.finalize((err) => {
-        if (err) {
-          console.error("Error inserting initial categories:", err);
-        } else {
-          console.log("Initial categories inserted.");
-        }
-        resolveReady(db);
-      });
-      return;
-    }
-
-    resolveReady(db);
+const run = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve(this);
+    });
   });
+
+const all = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+  });
+
+/**
+ * Inserts any category from the bundled seed file that is not present yet.
+ *
+ * data.json is the single source of truth for category definitions, so this
+ * deliberately does not hard-code the list: adding a category to the seed file is
+ * enough for it to appear on a fresh install. Existing rows are left untouched,
+ * which keeps a restart non-destructive and preserves any user edits.
+ */
+async function bootstrapCategories() {
+  const seedPath = path.join(__dirname, "data.json");
+  const seed = JSON.parse(fs.readFileSync(seedPath, "utf8"));
+
+  const existing = new Set(
+    (await all("SELECT id FROM categories")).map((row) => row.id),
+  );
+  const missing = seed.filter((cat) => !existing.has(cat.id));
+
+  if (missing.length === 0) {
+    console.log("Categories already present, nothing to bootstrap.");
+    return;
+  }
+
+  for (const cat of missing) {
+    await run("INSERT INTO categories (id, label, icon, color) VALUES (?, ?, ?, ?)", [
+      cat.id,
+      cat.label,
+      cat.icon,
+      cat.color,
+    ]);
+  }
+  console.log(`Bootstrapped ${missing.length} categories.`);
 }
 
 export default db;

@@ -7,43 +7,102 @@
     "questions": [
       {
         "q": "ما الفرق بين Service Container و Service Provider؟",
-        "a": "Service Container هو نظام dependency injection في Laravel — يُعنى بـ binding وresolving الكلاسات.\nService Provider هو المكان الذي تُسجّل فيه هذه الـ bindings وتُهيئ مكونات التطبيق.\n\nمثال:\n• Container: يعرف كيف يبني كلاس Logger\n• Provider: يخبر الـ Container \"استخدم FileLogger عند طلب LoggerInterface\""
+        "a": [
+          "Service Container هو نظام الـ dependency injection نفسه: هو الذي يعرف كيف يبني الكلاسات ويفكّ التبعيات (bind، resolve، singleton) اعتماداً على الـ type hints في الـ constructor.",
+          "Service Provider هو المكان الذي تُسجّل فيه هذه الـ bindings وتُهيّأ مكونات التطبيق، عادةً في method واحدة: register() للـ bindings و boot() للـ setup الذي يحتاج الـ Eloquent.",
+          "مثال عملي: الـ Container يعرف كيف يبني كلاس Logger، والـ Provider هو من يقول له: استخدم FileLogger عندما يُطلب LoggerInterface."
+        ],
+        "difficulty": "beginner",
+        "tags": ["service-container", "dependency-injection", "architecture"]
       },
       {
         "q": "اشرح Service Container و Dependency Injection بعمق",
-        "a": "Dependency Injection = تمرير التبعيات للكلاس بدلاً من أن ينشئها بنفسه.\n\nLaravel Container يدعم:\n1. Binding: app()->bind(Interface::class, Implementation::class)\n2. Singleton: app()->singleton(...) — نسخة واحدة طوال الـ request\n3. Auto-resolution: يحل الـ type hints تلقائياً من constructor\n4. Contextual Binding: نفس الـ Interface لكن تطبيق مختلف حسب السياق"
+        "a": [
+          "Dependency Injection = تمرير التبعيات للكلاس من الخارج بدلاً من أن ينشئها بنفسه، فيصبح الكلاس قابلاً للاختبار وتبديل الـ implementation بسهولة.",
+          "Binding: app()->bind(Interface::class, Implementation::class) يخبر الـ Container أي implementation يُستخدم عند طلب الـ Interface.",
+          "Singleton: app()->singleton(...) ينشئ نسخة واحدة طوال عمر التطبيق أو الـ request بدلاً من instance جديد في كل مرة.",
+          "Auto-resolution: الـ Container يقرأ الـ type hints في الـ constructor ويحلّ التبعيات تلقائياً دون أي binding يدوي.",
+          "Contextual Binding: نفس الـ Interface لكن implementation مختلفة حسب السياق، فتسجيل عربى مختلف في الـ admin context والـ mobile context."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["dependency-injection", "service-container", "testing"]
       },
       {
         "q": "ما هو Eloquent ORM وما مزاياه وعيوبه؟",
-        "a": "المزايا:\n• كود قابل للقراءة وسريع التطوير\n• Relationships بسيطة (hasMany, belongsTo...)\n• Mutators, Accessors, Observers\n• Soft Deletes و Timestamps تلقائية\n\nالعيوب:\n• N+1 Problem إن لم تستخدم eager loading\n• أبطأ من Query Builder لعمليات bulk\n• يصعب تحسين الأداء في queries معقدة\n\nالحل: استخدم with() للـ eager loading، وQuery Builder للعمليات الثقيلة"
+        "a": "المزايا:\n• كود قابل للقراءة وسريع التطوير\n• Relationships بسيطة (hasMany, belongsTo...)\n• Mutators, Accessors, Observers\n• Soft Deletes و Timestamps تلقائية\n\nالعيوب:\n• N+1 Problem إن لم تستخدم eager loading\n• أبطأ من Query Builder لعمليات bulk\n• يصعب تحسين الأداء في queries معقدة\n\nالحل: استخدم with() للـ eager loading، وQuery Builder للعمليات الثقيلة",
+        "difficulty": "beginner",
+        "tags": ["orm", "eloquent", "performance"]
       },
       {
         "q": "ما هو N+1 Problem وكيف تحله؟",
-        "a": "يحدث عندما تجلب N record ثم تُنفّذ query إضافية لكل record.\n\nمثال المشكلة:\n$posts = Post::all(); // 1 query\nforeach ($posts as $post) {\n  echo $post->user->name; // N queries!\n}\n\nالحل - Eager Loading:\n$posts = Post::with('user')->get(); // query واحدة فقط\n\nيمكن اكتشافه بـ:\n• Laravel Debugbar\n• Telescope\n• withCount() بدل العد اليدوي"
+        "a": "يحدث عندما تجلب N record ثم تُنفّذ query إضافية لكل record.\n\nمثال المشكلة:\n$posts = Post::all(); // 1 query\nforeach ($posts as $post) {\n  echo $post->user->name; // N queries!\n}\n\nالحل - Eager Loading:\n$posts = Post::with('user')->get(); // query واحدة فقط\n\nيمكن اكتشافه بـ:\n• Laravel Debugbar\n• Telescope\n• withCount() بدل العد اليدوي",
+        "difficulty": "intermediate",
+        "tags": ["orm", "performance", "eloquent"]
       },
       {
         "q": "ما الفرق بين Middleware و Policy و Gate؟",
-        "a": "Middleware: يعمل على مستوى الـ HTTP request قبل وصوله للـ controller\n→ مثال: التحقق من تسجيل الدخول، CORS، Rate Limiting\n\nGate: تحقق بسيط من صلاحية action معين\n→ مثال: Gate::define('edit-post', fn($user, $post) => $user->id === $post->user_id)\n\nPolicy: كلاس منظّم للصلاحيات المتعلقة بـ Model بعينه\n→ مثال: PostPolicy تحتوي view, create, update, delete"
+        "a": [
+          "Middleware: يعمل على مستوى الـ HTTP request قبل وصوله للـ controller. أمثلة: التحقق من تسجيل الدخول، CORS، Rate Limiting، تحديد الـ locale.",
+          "Gate: تحقق بسيط ومركّب في مكان واحد من صلاحية action معيّن داخل الـ controller، مثل Gate::define('edit-post', fn($user, $post) => $user->id === $post->user_id).",
+          "Policy: كلاس منظّم للصلاحيات المتعلقة بـ Model بعينه، ويجمع كل abilities الخاصة به (view, create, update, delete) في مكان واحد قابل لإعادة الاستخدام والاختبار.",
+          "القاعدة العملية: الـ Middleware يحمي المسار بالكامل، والـ Gate/Policy يحدد هل هذا المستخدم بالتحديد يستطيع تنفيذ هذا الـ action."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["middleware", "authorization", "security"]
       },
       {
         "q": "كيف تعمل Laravel Queues وما فائدتها؟",
-        "a": "Queues تُؤجّل تنفيذ المهام الثقيلة خارج الـ HTTP request lifecycle.\n\nالفائدة: تسريع الـ response للمستخدم\n\nكيف تعمل:\n1. Job يُدفع للـ Queue: dispatch(new SendEmailJob($user))\n2. Worker يسحب الـ Job وينفّذه: php artisan queue:work\n\nDrivers المتاحة: database, Redis, SQS, Beanstalkd\n\nمفاهيم مهمة:\n• Retry: عدد مرات إعادة المحاولة عند الفشل\n• Delay: تأجيل الـ Job\n• Horizon: واجهة مرئية لـ Redis queues"
+        "a": [
+          "Queues تُؤجّل تنفيذ المهام الثقيلة خارج الـ HTTP request lifecycle، فيستجيب الـ API فوراً للمستخدم بدل أن ينتظر حتى تنتهي المهمة.",
+          "الآلية: تُدفع الـ Job للـ Queue عبر dispatch(new SendEmailJob($user))، ثم يسحبها Worker منفصل وينفّذها بـ php artisan queue:work.",
+          "الـ Drivers المتاحة: database و Redis و SQS و Beanstalkd، والأفضل عادةً Redis أو SQS لأداء أعلى وموثوقية.",
+          "مفاهيم أساسية: retries_after لتحديد مهلة المحاولة و backoff لتأخير إعادة المحاولة، و unique jobs لمنع التكرار، و failed() لالتقاط الفشل النهائي.",
+          "المراقبة: Horizon واجهة مرئية على Redis queues تعرض الفشل والـ latency وتسمح بإعادة محاولة الـ jobs الفاشلة."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["queues", "architecture", "performance"]
       },
       {
         "q": "ما هو Observer Pattern في Laravel؟",
-        "a": "Observer يُراقب أحداث الـ Eloquent Model (creating, created, updating, updated, deleting...)\n\nمثال:\nclass OrderObserver {\n  public function created(Order $order) {\n    // إرسال إشعار عند إنشاء طلب\n  }\n}\n\n// في ServiceProvider:\nOrder::observe(OrderObserver::class);\n\nالفائدة: فصل الـ business logic عن الـ Model"
+        "a": "Observer يُراقب أحداث الـ Eloquent Model (creating, created, updating, updated, deleting...)\n\nمثال:\nclass OrderObserver {\n  public function created(Order $order) {\n    // إرسال إشعار عند إنشاء طلب\n  }\n}\n\n// في ServiceProvider:\nOrder::observe(OrderObserver::class);\n\nالفائدة: فصل الـ business logic عن الـ Model",
+        "difficulty": "beginner",
+        "tags": ["eloquent", "events", "design-patterns"]
       },
       {
         "q": "ما الفرق بين hasOne و belongsTo؟",
-        "a": "hasOne: الكلاس الحالي يمتلك كلاساً آخر (المفتاح الأجنبي في الجدول الآخر)\nUser hasOne Profile → في جدول profiles: user_id\n\nbelongsTo: الكلاس الحالي يتبع كلاساً آخر (المفتاح الأجنبي هنا)\nProfile belongsTo User → في جدول profiles: user_id\n\nالقاعدة: من عنده foreign key يكتب belongsTo"
+        "a": "hasOne: الكلاس الحالي يمتلك كلاساً آخر (المفتاح الأجنبي في الجدول الآخر)\nUser hasOne Profile → في جدول profiles: user_id\n\nbelongsTo: الكلاس الحالي يتبع كلاساً آخر (المفتاح الأجنبي هنا)\nProfile belongsTo User → في جدول profiles: user_id\n\nالقاعدة: من عنده foreign key يكتب belongsTo",
+        "difficulty": "beginner",
+        "tags": ["orm", "relationships", "eloquent"]
       },
       {
         "q": "ما هو Repository Pattern ولماذا يُستخدم في Laravel؟",
-        "a": "Repository يفصل منطق الوصول للبيانات عن الـ Business Logic.\n\ninterface UserRepositoryInterface {\n  public function find(int $id): User;\n  public function create(array $data): User;\n}\n\nclass EloquentUserRepository implements UserRepositoryInterface { ... }\n\nالفوائد:\n• سهولة التبديل بين مصادر البيانات\n• اختبار الكود بسهولة (Mock)\n• كود أنظف وأقل تكراراً"
+        "a": "Repository يفصل منطق الوصول للبيانات عن الـ Business Logic.\n\ninterface UserRepositoryInterface {\n  public function find(int $id): User;\n  public function create(array $data): User;\n}\n\nclass EloquentUserRepository implements UserRepositoryInterface { ... }\n\nالفوائد:\n• سهولة التبديل بين مصادر البيانات\n• اختبار الكود بسهولة (Mock)\n• كود أنظف وأقل تكراراً",
+        "difficulty": "intermediate",
+        "tags": ["repository-pattern", "architecture", "testing"]
       },
       {
         "q": "كيف تتعامل مع Database Transactions؟",
-        "a": "DB::transaction(function () {\n  $order = Order::create([...]);\n  $payment = Payment::create([...]);\n  // إذا حدث exception، سيتم Rollback تلقائياً\n});\n\nأو يدوياً:\nDB::beginTransaction();\ntry {\n  // operations\n  DB::commit();\n} catch (Exception $e) {\n  DB::rollBack();\n}\n\nمهم: استخدمها عند تغيير بيانات متعددة مترابطة"
+        "a": "DB::transaction(function () {\n  $order = Order::create([...]);\n  $payment = Payment::create([...]);\n  // إذا حدث exception، سيتم Rollback تلقائياً\n});\n\nأو يدوياً:\nDB::beginTransaction();\ntry {\n  // operations\n  DB::commit();\n} catch (Exception $e) {\n  DB::rollBack();\n}\n\nمهم: استخدمها عند تغيير بيانات متعددة مترابطة",
+        "difficulty": "intermediate",
+        "tags": ["transactions", "database", "eloquent"]
+      },
+      {
+        "q": "ما الفرق بين where و whereIn و whereHas ومتى تستخدم كل واحد؟",
+        "a": [
+          "where: لمطابقة قيمة واحدة على عمود، وهو أسرع ما يكون عند وجود index على العمود، مثل User::where('status', 'active').",
+          "whereIn: لمطابقة قائمة قيم في query واحدة بدل سلسلة من OR، مثل User::whereIn('role_id', [1, 2, 3]).",
+          "whereHas: للفلترة حسب وجود علاقة مرتبطة، وينتج EXISTS subquery، مثل Post::whereHas('comments', fn($q) => $q->where('approved', true)).",
+          "withWhereHas: بديل أحدث وأدق من whereHas عند الجمع مع eager loading، لأنه لا يُكرّر صف الـ parent في النتيجة.",
+          "ملاحظة أداء: تجنّب whereRaw بسلاسل نصية مبنية من input، واستخدم chunkById للـ pagination على الجداول الكبيرة بدل offset."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["orm", "eloquent", "performance"]
+      },
+      {
+        "q": "ما هو Facade وما مميزاته وعيوبه مقارنة بالـ Container؟",
+        "a": "Facade هو access class واحد تستخدمه لاستدعاء الـ service مباشرة بصيغة مختصرة:\nuse Illuminate\\Support\\Facades\\Cache;\nCache::get('key');\n\nالميزة: كود نظيف وقابل للقراءة، والـ binding الحقيقي يحدث في الـ ServiceProvider دون أن تتغير شكل الـ API.\n\nالعيب: إخفاء للـ dependencies يجعل اختبار الكلاس أصعب، لأنه لا يوضح ما يحتاجه في الـ constructor.\n\nالقاعدة العملية: استخدم Facade في الـ controllers والـ views، وحقن الـ Interface في الـ Services ليسهل اختبارها بـ Mock.",
+        "difficulty": "intermediate",
+        "tags": ["facades", "service-container", "architecture"]
       }
     ]
   },
@@ -55,23 +114,98 @@
     "questions": [
       {
         "q": "كيف تُحسّن أداء Laravel في الإنتاج؟",
-        "a": "1. Caching:\n   • Route cache: php artisan route:cache\n   • Config cache: php artisan config:cache\n   • View cache: php artisan view:cache\n   • Query cache باستخدام Redis\n\n2. Eager Loading لحل N+1\n\n3. Indexing على أعمدة قواعد البيانات المستخدمة in WHERE\n\n4. Queue للعمليات الثقيلة\n\n5. Horizon + Redis لمراقبة الـ queues\n\n6. Octane (Swoole/RoadRunner) لتسريع جذري"
+        "a": "1. Caching:\n   • Route cache: php artisan route:cache\n   • Config cache: php artisan config:cache\n   • View cache: php artisan view:cache\n   • Query cache باستخدام Redis\n\n2. Eager Loading لحل N+1\n\n3. Indexing على أعمدة قواعد البيانات المستخدمة in WHERE\n\n4. Queue للعمليات الثقيلة\n\n5. Horizon + Redis لمراقبة الـ queues\n\n6. Octane (Swoole/RoadRunner) لتسريع جذري",
+        "difficulty": "advanced",
+        "tags": ["performance", "caching", "optimization"]
       },
       {
         "q": "ما هو Event Sourcing وهل طبّقته؟",
-        "a": "بدلاً من حفظ الحالة النهائية، نحفظ كل الأحداث التي أدت إليها.\n\nمثال: بدلاً من حفظ balance = 500\nنحفظ:\n- AccountCreated (balance: 0)\n- MoneyDeposited (amount: 600)\n- MoneyWithdrawn (amount: 100)\n\nالفوائد: Audit log كامل، إمكانية replay الأحداث\nالأدوات في Laravel: spatie/laravel-event-sourcing"
+        "a": "بدلاً من حفظ الحالة النهائية، نحفظ كل الأحداث التي أدت إليها.\n\nمثال: بدلاً من حفظ balance = 500\nنحفظ:\n- AccountCreated (balance: 0)\n- MoneyDeposited (amount: 600)\n- MoneyWithdrawn (amount: 100)\n\nالفوائد: Audit log كامل، إمكانية replay الأحداث\nالأدوات في Laravel: spatie/laravel-event-sourcing",
+        "difficulty": "advanced",
+        "tags": ["event-sourcing", "architecture", "cqrs"]
       },
       {
         "q": "ما هو CQRS Pattern؟",
-        "a": "Command Query Responsibility Segregation\n\nفصل عمليات الكتابة (Commands) عن القراءة (Queries):\n\nCommand: ينفّذ عملية ويغيّر الحالة (لا يُرجع بيانات)\nQuery: يقرأ البيانات فقط (لا يغيّر الحالة)\n\nالفائدة: كل طرف يمكن تحسينه وتوسيعه باستقلالية\n→ مثال: قاعدة بيانات للكتابة، وأخرى مُحسّنة للقراءة"
+        "a": [
+          "CQRS اختصار لـ Command Query Responsibility Segregation: فصل عمليات الكتابة عن عمليات القراءة داخل النظام.",
+          "الـ Command ينفّذ عملية ويغيّر الحالة ولا يُرجع بيانات، بينما الـ Query يقرأ فقط ولا يغيّر أي حالة — وهذا الفصل يجعل تدفق البيانات واضحاً.",
+          "الفائدة: كل طرف يُحسَّن ويُوسَّع باستقلالية، فالقراءة تستخدم read models مُحسّنة (denormalized) والكتابة تحافظ على قواعد الـ business.",
+          "في Laravel: نموذج عملي هو Actions للكتابة و Queries للقراءة، وربط الـ API Resource بـ Read Model بدل الجدول الأساسي.",
+          "التحذير: لا تحتاجه في كل مشروع، فالتعقيد والـ operational cost يرتفعان. استخدمه عندما تكون أنماط القراءة والكتابة مختلفة فعلاً."
+        ],
+        "difficulty": "advanced",
+        "tags": ["cqrs", "architecture", "caching"]
       },
       {
         "q": "كيف تتعامل مع API Rate Limiting؟",
-        "a": "في Laravel عبر Middleware:\n\n// في RouteServiceProvider\nRateLimiter::for('api', function (Request $request) {\n  return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());\n});\n\n// في routes\nRoute::middleware(['throttle:api'])->group(...);\n\nمستويات متقدمة:\n• حدود مختلفة لـ authenticated vs guest\n• Dynamic limits حسب نوع المستخدم\n• Redis لتخزين العدادات"
+        "a": "في Laravel عبر Middleware:\n\n// في RouteServiceProvider\nRateLimiter::for('api', function (Request $request) {\n  return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());\n});\n\n// في routes\nRoute::middleware(['throttle:api'])->group(...);\n\nمستويات متقدمة:\n• حدود مختلفة لـ authenticated vs guest\n• Dynamic limits حسب نوع المستخدم\n• Redis لتخزين العدادات",
+        "difficulty": "intermediate",
+        "tags": ["rate-limiting", "security", "middleware"]
       },
       {
         "q": "ما هو Lazy Loading vs Eager Loading vs Lazy Eager Loading؟",
-        "a": "Lazy Loading (افتراضي):\n$post->user // query عند الوصول أول مرة فقط\n\nEager Loading:\nPost::with('user')->get() // تحميل مع الـ query الأساسية\n\nLazy Eager Loading:\n$posts = Post::all();\n$posts->load('user'); // تحميل لاحق بـ query واحدة\n\nمتى تستخدم كل واحدة؟\n• Eager: تعرف أنك ستحتاج العلاقة\n• Lazy Eager: قررت لاحقاً أنك تحتاجها\n• Lazy: علاقة نادر الاحتياج إليها"
+        "a": [
+          "Lazy Loading (الافتراضي في Eloquent): الـ query تُنفَّذ عند أول وصول للعلاقة فقط، وهي مريحة لكنها نقطة انكشاف كل مشاكل الـ N+1.",
+          "Eager Loading: Post::with('user')->get() يحمّل العلاقة ضمن الـ query الأساسية، وهو الخيار الافتراضي الصحيح لأنك تعرف مسبقاً أنك ستحتاج العلاقة.",
+          "Lazy Eager Loading: Post::all() ثم $posts->load('user') يحمّل كل العلاقات بـ query واحدة عند الطلب، مفيد إذا اكتشف الحاجة للعلاقة لاحقاً.",
+          "متى تستخدم كل واحدة؟ Eager للعلاقات التي تحتاجها في المسار السريع، و Lazy Eager إذا كانت مطلوبة في طبقة العرض فقط، و Lazy للعلاقات النادرة."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["orm", "performance", "eloquent"]
+      },
+      {
+        "q": "ما هو Laravel Octane ولماذا يسرّع التطبيق كثيراً؟",
+        "a": "Octane يشغّل التطبيق كخادم دائم باستخدام Swoole أو RoadRunner بدل php-fpm الذي يبدأ عملية PHP جديدة لكل request.\n\nالفائدة:\n• التطبيق يبقى محمّلاً في الذاكرة بين الطلبات\n• إقلاع شبه فوري للـ app container والـ routes\n• طلبات أعلى في الثانية على نفس الـ hardware\n\nالنقطة الحرجة: بما أن التطبيق يبقى في الذاكرة، لا تشارك أي حالة request عبر request أخرى (static variables أو singletons mutable)، وإلا ظهر تسريب بيانات بين المستخدمين.\n\nالتشغيل: php artisan octane:start بعد ضبط عدد الـ workers بشكل صحيح.",
+        "difficulty": "advanced",
+        "tags": ["performance", "scaling", "architecture"]
+      },
+      {
+        "q": "كيف تتعامل مع Multi-tenancy في Laravel؟",
+        "a": [
+          "أولاً اختر strategy: database لكل tenant (أقوى عزل وأعلى تكلفة)، أو schema لكل tenant، أو جدول مشترك مع عمود tenant_id (الأبسط والأسرع للبداية).",
+          "عزل النطاق: أضف global scope على الـ Model يفرض where tenant_id = session()->get('tenant') تلقائياً، فيصبح نسيان الفلتر مستحيلاً.",
+          "منع تسرب البيانات: تحقّق دائماً في الاستعلامات الحساسة، واستخدم route model binding مع فحص أن الـ id ينتمي فعلاً للـ tenant الحالي.",
+          "الـ Migrations: اشترك في global migrations بعدد العملاء، وأضف tenant-specific migrations عند الحاجة لتخصيص جداول بعضهم.",
+          "الكاش والجلسات: اجعل cache keys تتضمن tenant_id لتفادي خلط البيانات، واختر بين central sessions أو per-tenant queues حسب حجم النظام."
+        ],
+        "difficulty": "advanced",
+        "tags": ["multi-tenancy", "architecture", "security"]
+      },
+      {
+        "q": "كيف تنفّذ Cache Invalidation بشكل صحيح؟",
+        "a": "الـ Cache لا يعرف أن البيانات تغيّرت، فأنت مسؤول عن الإلغاء:\n\n1. TTL: أبسط استراتيجية، اجعل المدة قصيرة للبيانات الحساسة وطويلة للثابتة.\n2. Cache Tags: خزّن بمجموعات ثم Cache::tags(['user:5'])->flush() يمسح كل ما يخص هذا المستخدم دفعة واحدة.\n3. Cache Busting: أضف version counter داخل الـ key (user:5:v3) وزده عند التعديل، فلا حاجة لحذف أي مفتاح.\n4. Write-Through: حدّث الـ DB والـ cache معاً في نفس منطق الـ transaction لتفادي قراءة بيانات قديمة.\n\nالقاعدة الذهبية: لا تخزّن Models بـ relations غير محمّلة، وإلا خزّنت كائناً ناقصاً في الكاش.",
+        "difficulty": "advanced",
+        "tags": ["caching", "performance", "architecture"]
+      },
+      {
+        "q": "ما الفرق بين Event و Listener و Job في Laravel؟",
+        "a": [
+          "Event: إشعار بأن شيئاً حدث داخل الدومين، وهو ينفَّذ sync افتراضياً في نفس الـ request، مثل Registered أو OrderShipped.",
+          "Listener: الـ class الذي يستمع للـ Event وينفّذ المنطق. إذا implement ShouldQueue تحوّل إلى Job يُنفَّذ في الخلفية.",
+          "Job: مهمة قابلة للتأجيل والتنفيذ خارج الـ request عبر worker، وتُستخدم للعمليات الثقيلة أو التي يجب أن تنجح في النهاية.",
+          "الأفضل عملياً: أرسل Event رخيصاً من الـ Domain واربط به Listener مُqueued، فتحصل على كود نظيف دون حجب الـ response.",
+          "الفروق الجوهرية: Event للتواصل الداخلي بين أجزاء التطبيق، و Job لجدولة عمل غير متزامن، و Notification لإرسال رسالة فعلية للمستخدم."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["events", "queues", "architecture"]
+      },
+      {
+        "q": "ما هو Laravel Horizon وماذا يوفّر؟",
+        "a": "Horizon طبقة إدارة فوق Redis queues في Laravel، وليس مجرد واجهة رسومية.\n\nيوفّر:\n• Dashboard بمقاييس: عدد الـ jobs المنفذة، الفاشلة، والـ latency لكل queue\n• Monitoring dashboards تفاعلية مع تنبيهات عبر Slack أو Mail\n• إعادة محاولة job فاشلة أو كل الـ failed jobs دفعة واحدة\n• مولّد Supervisor يشغّل عدة workers باحتياط تلقائي\n\nإعداد مهم: اجعل retries_after أقل من الـ worker timeout، و horizon مصمّم لعملية application واحدة على خادم واحد، فليس بديلاً عن deployments متعددة.",
+        "difficulty": "intermediate",
+        "tags": ["queues", "monitoring", "redis"]
+      },
+      {
+        "q": "كيف تنفّذ database migration على جدول كبير بدون downtime؟",
+        "a": [
+          "قاعدة Expand-Migrate-Contract: أضف العمود الجديد أولاً، ثم انقل البيانات، ثم احذف القديم. كل خطوة قابلة للتراجع ولا تعلّق التطبيق.",
+          "Expand: أضف العمود nullable في migration منفصلة، واجعل الكود يعمل مع وجوده ومع غيابه في الوقت نفسه.",
+          "Migrate: نفّذ backfill على دفعات صغيرة (chunkById) بدلاً من UPDATE واحد على كل الصفوف، وراقب replication lag أثناء التنفيذ.",
+          "أضف dual-write مؤقتاً: الكتابة في العمود الجديد والقديم معاً لمدة كافية لتغطية كل الـ deployments المتوازية.",
+          "Contract: بعد نجاح النسخ، أوقف الكتابة على العمود القديم، ثم احذفه في migration منفصلة بعد فترة سماح (grace period)."
+        ],
+        "difficulty": "advanced",
+        "tags": ["migrations", "performance", "reliability"]
       }
     ]
   },
@@ -83,43 +217,112 @@
     "questions": [
       {
         "q": "ما الفرق بين REST و GraphQL؟",
-        "a": "REST:\n• Endpoints محددة لكل resource\n• قد تُرجع بيانات أكثر أو أقل مما تحتاج\n• سهل التخزين المؤقت (Caching)\n• أبسط في الاستخدام للـ simple APIs\n\nGraphQL:\n• Query واحدة تجلب بالضبط ما تحتاجه\n• تحل Over-fetching و Under-fetching\n• أصعب في الـ Caching\n• مثالي للـ complex data requirements وتطبيقات Mobile"
+        "a": "REST:\n• Endpoints محددة لكل resource\n• قد تُرجع بيانات أكثر أو أقل مما تحتاج\n• سهل التخزين المؤقت (Caching)\n• أبسط في الاستخدام للـ simple APIs\n\nGraphQL:\n• Query واحدة تجلب بالضبط ما تحتاجه\n• تحل Over-fetching و Under-fetching\n• أصعب في الـ Caching\n• مثالي للـ complex data requirements وتطبيقات Mobile",
+        "difficulty": "intermediate",
+        "tags": ["rest", "graphql", "api-design"]
       },
       {
         "q": "ما هو SOLID وكيف تطبّقه؟",
-        "a": "S - Single Responsibility: كل كلاس مسؤولية واحدة\nO - Open/Closed: مفتوح للتمديد، مغلق للتعديل\nL - Liskov Substitution: الـ subclass قابل للاستبدال بـ parent\nI - Interface Segregation: interfaces صغيرة ومحددة\nD - Dependency Inversion: اعتمد على abstractions لا implementations\n\nأهمها عملياً في Laravel:\n• S: افصل الـ Services عن Controllers\n• D: حقن Interfaces وليس Classes مباشرة"
+        "a": [
+          "S - Single Responsibility: كل كلاس مسؤولية واحدة فقط، فـ OrderService لا يتولى إرسال الإيميل ولا يبني الـ response.",
+          "O - Open/Closed: مفتوح للتمديد ومغلق للتعديل، فإضافة نوع رسوم جديد يتم بـ implementation جديد للـ interface دون تعديل الكلاس الأصلي.",
+          "L - Liskov Substitution: أي subclass يجب أن يكون قابلاً للاستبدال مكان الـ parent، فلا تلغِ دواله أو تغيّر معاملاتها.",
+          "I - Interface Segregation: اجعل الـ interfaces صغيرة ومحددة الغرض، فـ CanPay و CanRefund أفضل من interface ضخم فيه print و scan و fax.",
+          "D - Dependency Inversion: اعتمد على abstractions لا implementations، فحقن NotificationInterface بدل ربط كلاس محدد مباشرة.",
+          "في Laravel: أهم ممارستين هما فصل الـ Services عن الـ Controllers (S)، وحقن الـ Interfaces بدل الـ Classes (D) لتسهيل الاختبار."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["solid", "design-patterns", "architecture"]
       },
       {
         "q": "ما هو الفرق بين SQL و NoSQL؟",
-        "a": "SQL (Relational):\n• بيانات منظمة في جداول وعلاقات\n• ACID transactions\n• مثالي للبيانات ذات العلاقات المعقدة\n• أمثلة: MySQL, PostgreSQL\n\nNoSQL:\n• مرونة في الـ schema\n• أداء أعلى في الـ write-heavy ops\n• أنواع: Document (MongoDB), Key-Value (Redis), Column (Cassandra)\n• مثالي للبيانات الضخمة وغير المنتظمة\n\nالاختيار يعتمد على طبيعة البيانات والـ use case"
+        "a": "SQL (Relational):\n• بيانات منظمة في جداول وعلاقات\n• ACID transactions\n• مثالي للبيانات ذات العلاقات المعقدة\n• أمثلة: MySQL, PostgreSQL\n\nNoSQL:\n• مرونة في الـ schema\n• أداء أعلى في الـ write-heavy ops\n• أنواع: Document (MongoDB), Key-Value (Redis), Column (Cassandra)\n• مثالي للبيانات الضخمة وغير المنتظمة\n\nالاختيار يعتمد على طبيعة البيانات والـ use case",
+        "difficulty": "intermediate",
+        "tags": ["databases", "architecture"]
       },
       {
         "q": "كيف تصمم نظام Authentication آمن؟",
-        "a": "1. كلمات المرور: bcrypt/argon2 (لا MD5/SHA1 أبداً)\n2. HTTPS إلزامي لكل الـ endpoints\n3. JWT: قصير الصلاحية + Refresh Tokens\n4. Rate Limiting على login endpoint\n5. 2FA للحسابات الحساسة\n6. لا تُرجع معلومات توضح إن كان الـ email موجوداً\n7. HttpOnly Cookies للـ tokens (لا localStorage)\n8. CSRF Protection للـ form-based auth"
+        "a": "1. كلمات المرور: bcrypt/argon2 (لا MD5/SHA1 أبداً)\n2. HTTPS إلزامي لكل الـ endpoints\n3. JWT: قصير الصلاحية + Refresh Tokens\n4. Rate Limiting على login endpoint\n5. 2FA للحسابات الحساسة\n6. لا تُرجع معلومات توضح إن كان الـ email موجوداً\n7. HttpOnly Cookies للـ tokens (لا localStorage)\n8. CSRF Protection للـ form-based auth",
+        "difficulty": "advanced",
+        "tags": ["security", "authentication", "jwt"]
       },
       {
         "q": "ما هو Database Indexing وكيف تختار الـ Index؟",
-        "a": "Index = بنية بيانات تُسرّع البحث مقابل تبطيء الكتابة.\n\nمتى تضيف Index:\n• الأعمدة في WHERE كثيراً\n• الأعمدة في ORDER BY\n• Foreign Keys\n\nأنواع:\n• Single Column: على عمود واحد\n• Composite: على أكثر من عمود (الترتيب مهم!)\n• Unique Index: يمنع التكرار\n\nتجنّب:\n• فهرسة أعمدة ذات cardinality منخفض (مثل: gender)\n• فهرسة زائدة تُبطئ الكتابة"
+        "a": "Index = بنية بيانات تُسرّع البحث مقابل تبطيء الكتابة.\n\nمتى تضيف Index:\n• الأعمدة في WHERE كثيراً\n• الأعمدة في ORDER BY\n• Foreign Keys\n\nأنواع:\n• Single Column: على عمود واحد\n• Composite: على أكثر من عمود (الترتيب مهم!)\n• Unique Index: يمنع التكرار\n\nتجنّب:\n• فهرسة أعمدة ذات cardinality منخفض (مثل: gender)\n• فهرسة زائدة تُبطئ الكتابة",
+        "difficulty": "intermediate",
+        "tags": ["indexing", "performance", "databases"]
       },
       {
         "q": "ما هي ACID Properties؟",
-        "a": "Atomicity: كل العمليات تنجح أو كلها تفشل (لا نصف عملية)\nConsistency: البيانات تبقى في حالة صحيحة دائماً\nIsolation: الـ transactions المتزامنة لا تتداخل\nDurability: البيانات المحفوظة لا تُفقد حتى عند الأعطال\n\nمثال عملي: تحويل بنكي\n1. Atomicity: خصم + إضافة يحدثان معاً أو لا يحدثان\n2. Consistency: المجموع الكلي لا يتغير\n3. Isolation: تحويلان متزامنان لا يتضاربان\n4. Durability: بعد التأكيد، التحويل محفوظ نهائياً"
+        "a": [
+          "Atomicity: كل العمليات تنجح أو كلها تفشل، فلا توجد حالة نصف منفّذة. مثال: تحويل بنكي يخصم من حساب ويضيف لآخر إما معاً أو لا شيء.",
+          "Consistency: البيانات تبقى في حالة صحيحة دائماً، فكل الـ constraints وقواعد الـ business تبقى محققة قبل وبعد الـ transaction.",
+          "Isolation: الـ transactions المتزامنة لا ترى نتائج بعضها الجزئي، ومستوى العزل يحدد مدى هذا العزل صراحةً.",
+          "Durability: بعد الـ commit تكون البيانات محفوظة نهائياً حتى لو انقطعت الكهرباء أو انهار السيرفر مباشرة بعده."
+        ],
+        "difficulty": "beginner",
+        "tags": ["transactions", "databases", "acid"]
       },
       {
         "q": "ما هو Caching وما أنواعه؟",
-        "a": "Application Cache (Redis/Memcached):\n• بيانات مؤقتة في الذاكرة\n• Cache::remember('key', ttl, fn() => ...)\n\nHTTP Cache:\n• Cache-Control headers\n• ETag و Last-Modified\n\nDatabase Query Cache:\n• تخزين نتائج queries متكررة\n\nCDN Cache:\n• تخزين static assets قريباً من المستخدم\n\nاستراتيجيات الإلغاء:\n• TTL: انتهاء صلاحية تلقائي\n• Cache Tags: إلغاء مجموعة مترابطة\n• Cache Busting: تغيير الـ key عند تحديث البيانات"
+        "a": [
+          "Application Cache (Redis/Memcached): تخزين نتائج حساب أو query في الذاكرة عبر Cache::remember('key', $ttl, fn() => ...)، وهو الأسرع والأكثر استخداماً في الـ backend.",
+          "HTTP Cache: استخدام Cache-Control headers و ETag و Last-Modified ليستفيد المتصفح أو الـ CDN من نسخ موجودة مسبقاً دون إعادة طلب.",
+          "Database Query Cache: تخزين نتائج queries متكررة ومكلفة، مفيد في workloads ذات القراءة العالية مع invalidation دقيق.",
+          "CDN Cache: تخزين static assets و API responses قرب المستخدم جغرافياً، فيقلّل الضغط على السيرفر ويحسّن TTFB.",
+          "استراتيجيات الإلغاء: TTL لانتهاء صلاحية تلقائي، و Cache Tags لإلغاء مجموعة مترابطة دفعة واحدة، و Cache Busting بتغيير الـ key عند التحديث."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["caching", "performance", "redis"]
       },
       {
-        "q": "كيف تتعامل مع Concurrency وRace Conditions؟",
-        "a": "Race Condition: نتيجة تعتمد على ترتيب غير محدد لعمليات متزامنة\n\nالحلول:\n1. Database Locks:\n   Post::where('id', $id)->lockForUpdate()->first();\n\n2. Atomic Operations:\n   DB::table('accounts')->increment('balance', 100);\n\n3. Redis Locks (Distributed):\n   Cache::lock('key', 10)->block(5, function() { ... });\n\n4. Queue: تحويل العمليات المتزامنة إلى متسلسلة"
+        "q": "كيف تتعامل مع Concurrency و Race Conditions؟",
+        "a": [
+          "التعريف: Race Condition تحدث عندما تعتمد النتيجة على ترتيب غير محدد لعمليات متزامنة، مثل قراء رصيد ثم خصمه في طلبين متزامنين.",
+          "Database Locks: Post::where('id', $id)->lockForUpdate()->first() يأخذ قفل صف داخل transaction، وهو pessimistic locking.",
+          "Atomic Operations: DB::table('accounts')->increment('balance', 100) يبقى ذرياً داخل قاعدة البيانات ولا يحتاج قفلاً صريحاً.",
+          "Optimistic Locking: أضف عمود version، وحدّث بـ WHERE version = 5، ثم تحقّق من عدد الصفوف المتأثرة لكشف أي تعارض.",
+          "Redis Distributed Locks: Cache::lock('key', 10)->block(5, fn() => ...) للموارد المشتركة بين عدة سيرفرات، مع TTL إلزامي لتفادي التعطل الدائم.",
+          "عبر الـ queues: تحويل العمليات المتزامنة إلى متسلسلة باستخدام نفس الـ queue name يجعل التنفيذ متسلسلاً داخل نفس الـ worker."
+        ],
+        "difficulty": "advanced",
+        "tags": ["concurrency", "transactions", "redis"]
       },
       {
         "q": "ما هو الفرق بين Monolith و Microservices؟",
-        "a": "Monolith:\n+ أبسط في البداية والـ deployment\n+ لا latency بين الخدمات\n- صعب التوسع الانتقائي\n- كل شيء مترابط\n\nMicroservices:\n+ توسع انتقائي لكل خدمة\n+ استقلالية الفرق والـ deployment\n- تعقيد في الـ communication\n- حاجة لـ API Gateway, Service Discovery\n- Distributed transactions أصعب\n\nالتوصية: ابدأ Monolith، وانتقل لـ Microservices عند الحاجة الفعلية"
+        "a": "Monolith:\n+ أبسط في البداية والـ deployment\n+ لا latency بين الخدمات\n- صعب التوسع الانتقائي\n- كل شيء مترابط\n\nMicroservices:\n+ توسع انتقائي لكل خدمة\n+ استقلالية الفرق والـ deployment\n- تعقيد في الـ communication\n- حاجة لـ API Gateway, Service Discovery\n- Distributed transactions أصعب\n\nالتوصية: ابدأ Monolith، وانتقل لـ Microservices عند الحاجة الفعلية",
+        "difficulty": "intermediate",
+        "tags": ["architecture", "microservices", "distributed-systems"]
       },
       {
         "q": "ما هي HTTP Status Codes المهمة لـ API؟",
-        "a": "2xx - نجاح:\n200 OK, 201 Created, 204 No Content\n\n4xx - خطأ العميل:\n400 Bad Request (بيانات غلط)\n401 Unauthorized (غير مُعرَّف)\n403 Forbidden (معروف لكن لا صلاحية)\n404 Not Found\n409 Conflict (تعارض البيانات)\n422 Unprocessable Entity (validation error)\n429 Too Many Requests\n\n5xx - خطأ السيرفر:\n500 Internal Server Error\n503 Service Unavailable\n\nمهم: 401 vs 403\n401 = من أنت؟ (سجّل دخولك)\n403 = أعرف من أنت، لكن لا تملك الصلاحية"
+        "a": "2xx - نجاح:\n200 OK, 201 Created, 204 No Content\n\n4xx - خطأ العميل:\n400 Bad Request (بيانات غلط)\n401 Unauthorized (غير مُعرَّف)\n403 Forbidden (معروف لكن لا صلاحية)\n404 Not Found\n409 Conflict (تعارض البيانات)\n422 Unprocessable Entity (validation error)\n429 Too Many Requests\n\n5xx - خطأ السيرفر:\n500 Internal Server Error\n503 Service Unavailable\n\nمهم: 401 vs 403\n401 = من أنت؟ (سجّل دخولك)\n403 = أعرف من أنت، لكن لا تملك الصلاحية",
+        "difficulty": "beginner",
+        "tags": ["http", "api-design", "http-status-codes"]
+      },
+      {
+        "q": "ما هو Idempotency ولماذا يهم في الـ APIs؟",
+        "a": "العملية الـ idempotent هي التي ينتج عنها التكرار نفس النتيجة تماماً، أي أن إرسال نفس الطلب خمس مرات equival إرسالها مرة واحدة من ناحية الأثر.\n\nلماذا يهم:\n• العميل نفّذ العملية ثم حدث timeout فأعاد المحاولة تلقائياً، فتكرر الخصم مرتين.\n• المستخدم ضغط زر الإرسال عدة مرات، فيتكرر الأثر.\n\nالحل العملي: يولّد العميل مفتاحاً فريداً (idempotency key) ويرسله في الـ header، فيحفظ الخادم الـ request والـ response مرتبطين بهذا المفتاح، وأي طلب تكرار يعيد نفس الرد المحفوظ بدل تنفيذ العملية.\n\nمتى لا يكون مناسباً؟ في العمليات التي لا يمكن تكرارها أصلاً، لكن يبقى هذا التصميم هو الافتراضي الآمن.",
+        "difficulty": "advanced",
+        "tags": ["api-design", "distributed-systems", "reliability"]
+      },
+      {
+        "q": "ما الفرق بين POST و PUT و PATCH و DELETE في RESTful API؟",
+        "a": "POST: ينشئ مورداً جديداً أو يستدعي إجراء غير idempotent مثل payment capture. الخادم يولّد الـ id ويعيد 201 Created مع Location header.\n\nPUT: استبدال كامل للمورد (full replacement). يجب إرسال representation كامل، وتكراره يعطي نفس النتيجة.\n\nPATCH: تعديل جزئي، أرسل فقط الحقول المتغيّرة. هو الأعملي في أغلب الحالات لأنه أقل خطورة وأسهل في الـ validation الجزئي.\n\nDELETE: إزالة المورد وهو idempotent أيضاً، فتكراره يعيد 404 بعد الحذف الأول.\n\nنصيحة: استخدم PUT/PATCH للعمليات الآمنة التكرار لتتمكن من retry، واحتفظ بـ POST للأحداث التي لا يمكن تكرارها.",
+        "difficulty": "beginner",
+        "tags": ["rest", "api-design", "http"]
+      },
+      {
+        "q": "ما الفرق بين Authentication و Authorization و OAuth2؟",
+        "a": [
+          "Authentication = من أنت؟ التحقق من الهوية عبر credentials أو token، ويحدث غالباً في طبقة الـ middleware.",
+          "Authorization = ماذا يحق لك أن تفعل؟ تقييم الصلاحيات بعد التحقق من الهوية، مثل Policy و Gate، ويأتي دائماً بعد الـ authentication.",
+          "OAuth2 = بروتوكول تفويض يتيح للتطبيق الوصول إلى موارد المستخدم بدون مشاركة كلمة المرور، ويعطي access token محدود الصلاحية ومدة قصيرة.",
+          "OIDC (OpenID Connect) طبقة تُضاف فوق OAuth2 لهدف Authentication تحديداً، بينما OAuth2 نفسه بروتوكول Authorization لا يثبت الهوية.",
+          "المبدأ العملي: لا تبنِ على Implicit flow في تطبيقات الويب، استخدم Authorization Code + PKCE، وخزّن الـ tokens في HttpOnly cookies لا localStorage."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["oauth", "security", "authentication"]
       }
     ]
   },
@@ -131,15 +334,102 @@
     "questions": [
       {
         "q": "كيف تصمم نظاماً يتحمل ملايين المستخدمين؟",
-        "a": "1. Load Balancing: توزيع الـ requests على عدة servers\n2. Horizontal Scaling: إضافة servers بدلاً من تقوية واحد\n3. Caching Layer: Redis/Memcached لتقليل الضغط على DB\n4. CDN: للـ static content\n5. Database:\n   • Read Replicas: توزيع القراءة\n   • Sharding: توزيع البيانات\n6. Async Processing: Queues للعمليات الثقيلة\n7. Database Connection Pooling\n8. Microservices: فصل الخدمات للتوسع الانتقائي"
+        "a": [
+          "Load Balancing: توزيع الـ requests على عدة servers عبر Nginx أو Cloud Load Balancer، وهو الأساس لأي توسع أفقي.",
+          "Horizontal Scaling: إضافة servers بدلاً من تقوية واحد، بشروط أن التطبيق stateless حتى يمكن إضافة أي instance بحرية.",
+          "Caching Layer: Redis فوق قاعدة البيانات وفق cache-aside strategy، فينزل زمن الاستجابة من مئات الـ ms إلى أقل من ms.",
+          "CDN: للـ static content وللـ API responses العامة، فيقلّل الحمل على الـ origin ويقرّب المحتوى من المستخدم.",
+          "Database: Read Replicas لتوزيع عبء القراءة، و Sharding لتقسيم البيانات أفقياً عندما يتجاوز الجدول حدود الـ IO.",
+          "Async Processing: Queues لكل ما هو ثقيل (إرسال إيميل، توليد تقرير، معالجة صور) حتى لا يحجب الـ response.",
+          "Connection Pooling و multi-region مع failover آلي، ومراقبة للـ bottlenecks قبل أن تتحول إلى outage."
+        ],
+        "difficulty": "advanced",
+        "tags": ["scalability", "load-balancing", "caching"]
       },
       {
         "q": "ما هو CAP Theorem؟",
-        "a": "في نظام موزّع، لا يمكنك ضمان الثلاثة معاً:\n\nC - Consistency: كل node يرى نفس البيانات\nA - Availability: كل request يحصل على response\nP - Partition Tolerance: النظام يعمل رغم انقطاع الشبكة\n\nالـ Partition حتمي في الأنظمة الموزعة، فالاختيار بين:\n• CP (مثل MongoDB, Redis): الاتساق على حساب التوفر\n• AP (مثل Cassandra, CouchDB): التوفر على حساب الاتساق\n\nمعظم الأنظمة الحديثة تختار AP مع eventual consistency"
+        "a": "في نظام موزّع، لا يمكنك ضمان الثلاثة معاً:\n\nC - Consistency: كل node يرى نفس البيانات\nA - Availability: كل request يحصل على response\nP - Partition Tolerance: النظام يعمل رغم انقطاع الشبكة\n\nالـ Partition حتمي في الأنظمة الموزعة، فالاختيار بين:\n• CP (مثل MongoDB, Redis): الاتساق على حساب التوفر\n• AP (مثل Cassandra, CouchDB): التوفر على حساب الاتساق\n\nمعظم الأنظمة الحديثة تختار AP مع eventual consistency",
+        "difficulty": "intermediate",
+        "tags": ["cap-theorem", "distributed-systems", "consistency"]
       },
       {
         "q": "كيف تصمم نظام تخزين ملفات قابل للتوسع؟",
-        "a": "المكونات:\n1. Object Storage: S3/Google Cloud Storage (لا local storage)\n2. CDN: CloudFront/Cloudflare لتوصيل سريع\n3. Metadata DB: معلومات الملفات في SQL/NoSQL\n4. Processing Queue: ضغط صور، تحويل صيغ بالـ background\n\nتصميم الـ Upload:\n• Presigned URLs: العميل يرفع مباشرة لـ S3 (لا يمر بسيرفرك)\n• Chunked Upload للملفات الكبيرة\n• Virus Scanning قبل الحفظ النهائي\n\nفي Laravel: Storage::disk('s3')->put(...)"
+        "a": "المكونات:\n1. Object Storage: S3/Google Cloud Storage (لا local storage)\n2. CDN: CloudFront/Cloudflare لتوصيل سريع\n3. Metadata DB: معلومات الملفات في SQL/NoSQL\n4. Processing Queue: ضغط صور، تحويل صيغ بالـ background\n\nتصميم الـ Upload:\n• Presigned URLs: العميل يرفع مباشرة لـ S3 (لا يمر بسيرفرك)\n• Chunked Upload للملفات الكبيرة\n• Virus Scanning قبل الحفظ النهائي\n\nفي Laravel: Storage::disk('s3')->put(...)",
+        "difficulty": "advanced",
+        "tags": ["storage", "scalability", "cdn"]
+      },
+      {
+        "q": "ما هو Load Balancing وما الفرق بين خوارزميات التوزيع الشائعة؟",
+        "a": [
+          "Load Balancing هو توزيع الطلبات على عدة instances خلف عنوان واحد، ويوفّر failover تلقائي ويزيل نقطة فشل واحدة.",
+          "Round Robin: تدوير الطلبات بالتسلسل، بسيط ومثالي عندما تكون الطلبات متساوية الثقل ومتزامنة تقريباً.",
+          "Least Connections: توجيه الطلب للـ instance الأقل عدداً اتصالات مفتوحة، وهو الأنسب مع طلبات طويلة ومتوسطة الأوزان.",
+          "IP Hash: hash للـ IP لاختيار server ثابت، مفيد للجلسات stateful أو sticky sessions، لكنه يخلق hot spots إذا تركز مستخدمون على نطاق واحد.",
+          "Weighted: توزيع مرجّح حسب قدرة كل instance، مفيد عند اختلاف أنواع الـ hardware بين السيرفرات."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["load-balancing", "scalability", "distributed-systems"]
+      },
+      {
+        "q": "ما هو Sharding وما الفرق بين Horizontal و Vertical Partitioning؟",
+        "a": "Vertical Partitioning: تقسيم أعمدة الجدول الواحد إلى جداول متخصصة (users و user_profiles)، فيقلّ حجم الصف الواحد لكن عدد الجداول ينمو ولن يتجاوز حاجز التوسع الأفقي.\n\nHorizontal Sharding: تقسيم الصفوف على عدة shards حسب مفتاح (tenant_id أو hash(user_id))، فيتوسع النظام أفقياً ويسمح بتوزيع الحمل على عدة أجهزة.\n\nالتحدي الحقيقي ليس التخزين بل إعادة التوزيع (resharding) واختيار shard key مناسب:\n• Shard by tenant: كل استعلامات الـ tenant في مكان واحد وسهل التوسع، لكن توزيع الحمل قد يكون غير متوازن.\n• Shard by hash: توزيع متوازن تلقائياً، لكن كل استعلام عبر عدة shards.\n\nالحل الوسط الشائع: shard by tenant للعزل، مع read replicas و caching داخل كل shard.",
+        "difficulty": "advanced",
+        "tags": ["sharding", "databases", "scalability"]
+      },
+      {
+        "q": "كيف تصمم Rate Limiting موزّعاً عبر عدة سيرفرات؟",
+        "a": "العدّاد يجب أن يكون مشتركاً بين كل الـ instances، فالـ in-memory counter يُصفّر مع كل instance جديد.\n\nالخطة العملية:\n1. Redis: INCR مع EXPIRE في عملية واحدة (يفضّل عبر Lua script للذرّية) بتكلفة O(1).\n2. Sliding window log: sorted set بالـ timestamps، أدق من fixed window لكنه أغلى في الذاكرة.\n3. Token Bucket: يسمح بـ burst محدود مع معدل ثابت، وهو الأنسب لحماية الـ APIs.\n4. Lua script أو Redis transaction لضمان ذرّية الزيادة وفحص الحد.\n5. التوسع: shard المفاتيح حسب user_id لتوزيع الحمل، و Redis Cluster للتوسع الأفقي.\n\nقاعدة مهمة: طبّق الـ rate limit على مستوى الـ API Gateway أيضاً، فالـ limit على السيرفر وحده لا يحمي من الطلبات على النقاط الأخرى.",
+        "difficulty": "advanced",
+        "tags": ["rate-limiting", "distributed-systems", "redis"]
+      },
+      {
+        "q": "ما هو Idempotency Key وكيف تمنع التكرار في العمليات المالية؟",
+        "a": [
+          "المشكلة: العميل نفّذ العملية ثم لم تصل الاستجابة (timeout أو انقطاع شبكة)، فأعاد المحاولة ودفع مرتين.",
+          "الحل: العميل يولّد مفتاحاً فريداً (UUID) ويرسله في header باسم Idempotency-Key مع كل عملية حساسة.",
+          "التنفيذ: على الخادم خزّن hash للـ request في جدول أو Redis مرتبطاً بالمفتاح، ومعه الـ response ووقت الانتهاء.",
+          "السلوك: إن وُجد المفتاح مسبقاً، أعد نفس الـ response المخزن بدون تنفيذ العملية، وأرجع 409 إن اختلف الـ payload للمفتاح نفسه.",
+          "تفاصيل مهمة: اجعل التخزين ذرياً باستخدام unique constraint على العمود، وحدّد TTL (24 ساعة عادةً) لتنظيف السجلات القديمة."
+        ],
+        "difficulty": "advanced",
+        "tags": ["idempotency", "distributed-systems", "api-design"]
+      },
+      {
+        "q": "ما الفرق بين RabbitMQ و Redis Streams و SQS كـ message brokers؟",
+        "a": "RabbitMQ: broker غني بالميزات مع routing keys و exchanges و acknowledgements صريحة و dead letter queues. مناسب للـ routing المعقد ولضمان التسليم، لكنه يحتاج تشغيلاً وصيانة من فريقك.\n\nRedis Streams: مبني على بنية Redis نفسها، خفيف وعالي الـ throughput، لكنه يتطلب إدارة يدوية لـ consumer groups-offset-pending وأ deletio السجلات.\n\nSQS: خدمة مُدارة من AWS، لا تشغّل شيئاً، تتوسع تلقائياً، وتدعم DLQ و FIFO queues بتكلفة بسيطة. الخيار الافتراضي في البيئات على AWS.\n\nالاختيار: SQS أو RabbitMQ للعمليات الحرجة التي تحتاج ضمان تسليم، و Redis Streams للأحجام العالية ذات المهام القصيرة التي تتحمل occasional loss.",
+        "difficulty": "intermediate",
+        "tags": ["message-queues", "distributed-systems", "architecture"]
+      },
+      {
+        "q": "كيف تتعامل مع فشل الأجزاء في نظام موزّع؟",
+        "a": [
+          "Circuit Breaker: عند تكرار فشل الخدمة البعيدة، افتح الدائرة وتوقف إرسال الطلبات مؤقتاً (fail fast) بدل إهدار الوقت في الانتظار، ثم جرّب إغلاقها دورياً.",
+          "Retry with Backoff + Jitter: أعد المحاولة بتأخير متزايد مع عشوائية لتفادي thundering herd، وقلّل عدد المحاولات حتى لا تضاعف الحمل على نظام فاشل.",
+          "Timeouts و Bulkheads: حدد timeout قصير لكل خدمة، واعزل resources كل خدمة في thread pool مستقل حتى لا تسحب خدمة متعثرة بقية النظام معه.",
+          "Fallback: قدّم قيمة بديلة عند الفشل (صفحة مخزنة، نسخة read-only، أو نتيجة previous known-good) حتى يبقى الـ UX مقبولاً.",
+          "Idempotency: أي عملية إعادة محاولة يجب أن تكون آمنة التكرار، مع dead letter queue للتعامل مع الرسائل التي فشلت كل محاولات."
+        ],
+        "difficulty": "advanced",
+        "tags": ["resilience", "distributed-systems", "microservices"]
+      },
+      {
+        "q": "كيف تصمم نظام بحث سريع داخل تطبيق كبير؟",
+        "a": "لا تبحث بـ LIKE '%term%' على جدول ضخم، استخدم محرك بحث متخصصاً.\n\n1. Elasticsearch أو OpenSearch: الـ inverted index يحوّل البحث النصي إلى O(1) تقريباً، مع relevance scoring و faceting.\n2. Postgres Full-Text Search: كافٍ تماماً للبحث البسيط ويُفضّل حين لا تريد إضافة خدمة جديدة، مع GIN index على عمود tsvector.\n3. الاختيار: Full-text داخل Postgres للـ MVP وللبحث البسيط، و Elasticsearch عند الحاجة إلى stemming أو مرادفات أو فلاتر مركبة معقدة.\n\nالتحدي الأساسي هو الـ consistency: نتائج محرك البحث قد تتأخر عن الـ DB، فاستخدم outbox pattern مع consumer لتحديث الـ index بشكل متزامن أو دوري.",
+        "difficulty": "advanced",
+        "tags": ["search", "indexing", "scalability"]
+      },
+      {
+        "q": "ما هو Database Replication وما هي مشاكل Replication Lag؟",
+        "a": [
+          "الـ Replication يعني وجود نسخة من الـ primary على أكثر من replica، ويُستخدم أساساً لتوزيع عبء القراءة وتحسين التوافر عند فشل الـ primary.",
+          "الفائدة: توجيه أغلب الاستعلامات للـ read replicas يخفّف الحمل على الـ primary كثيراً، مع failover تلقائي عند تعطله.",
+          "الـ Replication Lag: تأخر وصول البيانات إلى الـ replica، وقد يكون من أجزاء من الثانية إلى ثوانٍ تحت الحمل العالي، وهو سبب شائع لظهور بيانات قديمة بعد الكتابة مباشرة.",
+          "الحل 1: اقرأ بعد الكتابة من الـ primary، أي أن الطلب الذي يلي عملية كتابة يذهب للـ primary دوماً.",
+          "الحل 2: قِس الـ lag وراقبه واضبط إعدادات WAL والشبكة، وارفض القراءة من replica إذا تجاوز التأخير حداً معيناً.",
+          "الحل 3: للبيانات الحرجة استخدم read-your-writes عبر token يحمل وقت آخر كتابة."
+        ],
+        "difficulty": "advanced",
+        "tags": ["databases", "replication", "scalability"]
       }
     ]
   },
@@ -151,43 +441,87 @@
     "questions": [
       {
         "q": "كيف يعمل Event Loop في Node.js؟",
-        "a": "Node.js يعمل على خيط واحد (Single Thread) لكنه غير متزامن بفضل Event Loop.\n\nمراحل Event Loop بالترتيب:\n1. timers: تنفيذ setTimeout و setInterval\n2. I/O callbacks: callbacks من عمليات I/O\n3. idle/prepare: داخلي\n4. poll: انتظار أحداث I/O جديدة\n5. check: تنفيذ setImmediate\n6. close callbacks: مثل socket.on('close')\n\nالفرق بين setTimeout و setImmediate:\n• setTimeout(fn, 0): ينفّذ في مرحلة timers\n• setImmediate(fn): ينفّذ في مرحلة check (أسرع في I/O context)\n\nprocess.nextTick: ينفّذ قبل الانتقال لأي مرحلة (أولوية قصوى)"
+        "a": "Node.js يعمل على خيط واحد (Single Thread) لكنه غير متزامن بفضل Event Loop.\n\nمراحل Event Loop بالترتيب:\n1. timers: تنفيذ setTimeout و setInterval\n2. I/O callbacks: callbacks من عمليات I/O\n3. idle/prepare: داخلي\n4. poll: انتظار أحداث I/O جديدة\n5. check: تنفيذ setImmediate\n6. close callbacks: مثل socket.on('close')\n\nالفرق بين setTimeout و setImmediate:\n• setTimeout(fn, 0): ينفّذ في مرحلة timers\n• setImmediate(fn): ينفّذ في مرحلة check (أسرع في I/O context)\n\nprocess.nextTick: ينفّذ قبل الانتقال لأي مرحلة (أولوية قصوى)",
+        "difficulty": "intermediate",
+        "tags": ["event-loop", "async"]
       },
       {
         "q": "ما الفرق بين Callback و Promise و Async/Await؟",
-        "a": "Callback (القديم):\nfs.readFile('file', (err, data) => {\n  if (err) throw err;\n  // Callback Hell إذا تداخلت\n});\n\nPromise:\nfs.promises.readFile('file')\n  .then(data => ...)\n  .catch(err => ...);\n\nAsync/Await (الأفضل):\ntry {\n  const data = await fs.promises.readFile('file');\n} catch (err) { ... }\n\nالأداء: متطابق تقريباً، لكن Async/Await أوضح وأسهل في الـ debugging\nمشكلة شائعة: await داخل forEach لا يعمل كما تتوقع — استخدم for...of"
+        "a": [
+          "Callback (القديم): دالة تُمرَّر لتنفيذها بعد انتهاء العملية. بسيط لكنه ينتج Callback Hell عند التداخل، وغياب try/catch يجعل معالجة الأخطاء فوضوية.",
+          "Promise: كائن يمثّل نتيجة ستتحدد لاحقاً، مع then للـ chaining و catch للأخطاء و finally للتنظيف. يحل Callback Hell نهائياً.",
+          "Async/Await: صياغة فوق Promises تجعل الكود يبدو متزامناً وواضحاً، مع try/catch طبيعي حول الكود غير المتزامن.",
+          "الأداء: متطابق تقريباً، فـ async/await مجرد syntax sugar فوق Promises، فلا تتوقع فرقاً في السرعة.",
+          "مخطئ شائع: await داخل forEach لا ينتظر، استخدم for...of أو Promise.all إن أردت parallelism حقيقياً."
+        ],
+        "difficulty": "beginner",
+        "tags": ["async", "event-loop"]
       },
       {
         "q": "ما هو Cluster Module ولماذا نستخدمه؟",
-        "a": "Node.js يعمل على core واحد افتراضياً. Cluster يُمكّنه من استخدام كل cores الـ CPU.\n\nconst cluster = require('cluster');\nconst numCPUs = require('os').cpus().length;\n\nif (cluster.isPrimary) {\n  for (let i = 0; i < numCPUs; i++) {\n    cluster.fork(); // ينشئ Worker process\n  }\n} else {\n  // كود السيرفر هنا\n  app.listen(3000);\n}\n\nالبديل الحديث: PM2 يدير الـ clustering تلقائياً\npm2 start app.js -i max"
+        "a": "Node.js يعمل على core واحد افتراضياً. Cluster يُمكّنه من استخدام كل cores الـ CPU.\n\nconst cluster = require('cluster');\nconst numCPUs = require('os').cpus().length;\n\nif (cluster.isPrimary) {\n  for (let i = 0; i < numCPUs; i++) {\n    cluster.fork(); // ينشئ Worker process\n  }\n} else {\n  // كود السيرفر هنا\n  app.listen(3000);\n}\n\nالبديل الحديث: PM2 يدير الـ clustering تلقائياً\npm2 start app.js -i max",
+        "difficulty": "intermediate",
+        "tags": ["clustering", "performance", "scaling"]
       },
       {
         "q": "ما هو Stream في Node.js وما فائدته؟",
-        "a": "Stream = معالجة البيانات قطعة قطعة بدلاً من تحميلها كاملة في الذاكرة.\n\nأنواع Streams:\n• Readable: قراءة بيانات (fs.createReadStream)\n• Writable: كتابة بيانات (fs.createWriteStream)\n• Duplex: قراءة وكتابة (TCP socket)\n• Transform: تحويل البيانات (zlib, crypto)\n\nمثال عملي — رفع ملف كبير:\n// ❌ بدون Stream: يحمّل الملف كله في RAM\n// ✅ مع Stream:\nfs.createReadStream('bigfile.csv')\n  .pipe(csvParser())\n  .pipe(dbWriteStream);\n\nالفائدة: ذاكرة ثابتة حتى مع ملفات ضخمة"
+        "a": "Stream = معالجة البيانات قطعة قطعة بدلاً من تحميلها كاملة في الذاكرة.\n\nأنواع Streams:\n• Readable: قراءة بيانات (fs.createReadStream)\n• Writable: كتابة بيانات (fs.createWriteStream)\n• Duplex: قراءة وكتابة (TCP socket)\n• Transform: تحويل البيانات (zlib, crypto)\n\nمثال عملي — رفع ملف كبير:\n// ❌ بدون Stream: يحمّل الملف كله في RAM\n// ✅ مع Stream:\nfs.createReadStream('bigfile.csv')\n  .pipe(csvParser())\n  .pipe(dbWriteStream);\n\nالفائدة: ذاكرة ثابتة حتى مع ملفات ضخمة",
+        "difficulty": "intermediate",
+        "tags": ["streams", "performance", "memory"]
       },
       {
         "q": "ما الفرق بين require و import في Node.js؟",
-        "a": "require (CommonJS — الافتراضي في Node):\n• متزامن (Synchronous)\n• يمكن استخدامه في أي مكان بالكود\n• const express = require('express')\n\nimport (ES Modules):\n• غير متزامن (Asynchronous)\n• يجب أن يكون في أعلى الملف\n• import express from 'express'\n• يحتاج \"type\": \"module\" في package.json أو امتداد .mjs\n\nالتوجه الحديث: ES Modules هو المستقبل، لكن CommonJS لا يزال شائعاً جداً"
+        "a": [
+          "require (CommonJS، الافتراضي في Node): متزامن، يعمل في أي مكان بالكود، ويعيد الـ module مباشرة دون الحاجة لطريقة .default.",
+          "import (ES Modules): غير متزامن من ناحية التحميل، يجب أن يكون في أعلى الملف، ويعيد namespace object قد تحتاج .default للوصول للـ default export.",
+          "التفعيل: يحتاج type: module في package.json أو تسمية الملف بامتداد .mjs لكل ملف على حدة.",
+          "الميزة العملية لـ ESM: static analysis يسمح بـ tree-shaking و dynamic import، ويجعل دورات الاعتماد (circular dependencies) أوضح.",
+          "التوجه الحديث: ES Modules هو المعيار، لكن CommonJS لا يزال شائعاً جداً في الحزم المنشورة، فتأكد من نظام الوحدات قبل الاستيراد."
+        ],
+        "difficulty": "beginner",
+        "tags": ["modules", "esm"]
       },
       {
         "q": "كيف تتعامل مع Memory Leaks في Node.js؟",
-        "a": "أسباب شائعة للـ Memory Leaks:\n1. Event Listeners لم تُزل (emitter.removeListener)\n2. Closures تحتفظ بـ references غير ضرورية\n3. Global variables تتراكم\n4. Caching بدون حد أقصى\n\nأدوات الكشف:\n• process.memoryUsage() للمراقبة\n• --inspect flag مع Chrome DevTools\n• clinic.js أو 0x للتحليل العميق\n• heapdump لتحليل الـ heap\n\nنصيحة: استخدم WeakMap/WeakSet للـ caches — تُفرغ تلقائياً مع Garbage Collection"
+        "a": "أسباب شائعة للـ Memory Leaks:\n1. Event Listeners لم تُزل (emitter.removeListener)\n2. Closures تحتفظ بـ references غير ضرورية\n3. Global variables تتراكم\n4. Caching بدون حد أقصى\n\nأدوات الكشف:\n• process.memoryUsage() للمراقبة\n• --inspect flag مع Chrome DevTools\n• clinic.js أو 0x للتحليل العميق\n• heapdump لتحليل الـ heap\n\nنصيحة: استخدم WeakMap/WeakSet للـ caches — تُفرغ تلقائياً مع Garbage Collection",
+        "difficulty": "advanced",
+        "tags": ["memory", "performance", "debugging"]
       },
       {
         "q": "ما هو Middleware في Express وكيف يعمل؟",
-        "a": "Middleware = دالة تُنفَّذ بين استقبال الـ request وإرسال الـ response.\n\nالتوقيع: (req, res, next) => { ... }\n\nأنواع:\n1. Application-level: app.use(fn)\n2. Router-level: router.use(fn)\n3. Error-handling: (err, req, res, next) => {}\n4. Built-in: express.json(), express.static()\n5. Third-party: cors(), helmet(), morgan()\n\nالترتيب مهم جداً — يُنفَّذ بالتسلسل:\napp.use(logger);      // 1\napp.use(auth);        // 2\napp.use('/api', router); // 3\n\nلا تنسَ استدعاء next() وإلا الـ request سيتوقف"
+        "a": "Middleware = دالة تُنفَّذ بين استقبال الـ request وإرسال الـ response.\n\nالتوقيع: (req, res, next) => { ... }\n\nأنواع:\n1. Application-level: app.use(fn)\n2. Router-level: router.use(fn)\n3. Error-handling: (err, req, res, next) => {}\n4. Built-in: express.json(), express.static()\n5. Third-party: cors(), helmet(), morgan()\n\nالترتيب مهم جداً — يُنفَّذ بالتسلسل:\napp.use(logger);      // 1\napp.use(auth);        // 2\napp.use('/api', router); // 3\n\nلا تنسَ استدعاء next() وإلا الـ request سيتوقف",
+        "difficulty": "beginner",
+        "tags": ["express", "middleware", "http"]
       },
       {
         "q": "كيف تحمي Node.js API من الهجمات الشائعة؟",
-        "a": "1. Helmet: يضبط HTTP headers الأمنية\n   app.use(helmet())\n\n2. Rate Limiting:\n   app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }))\n\n3. CORS صحيح:\n   app.use(cors({ origin: 'https://myapp.com' }))\n\n4. Input Validation:\n   Joi أو Zod لـ validate كل input\n\n5. SQL/NoSQL Injection:\n   استخدم parameterized queries دائماً\n\n6. JWT Secrets قوية + انتهاء صلاحية قصير\n\n7. لا تُظهر stack traces في الـ production\n\n8. حدّث dependencies دورياً (npm audit)"
+        "a": "1. Helmet: يضبط HTTP headers الأمنية\n   app.use(helmet())\n\n2. Rate Limiting:\n   app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }))\n\n3. CORS صحيح:\n   app.use(cors({ origin: 'https://myapp.com' }))\n\n4. Input Validation:\n   Joi أو Zod لـ validate كل input\n\n5. SQL/NoSQL Injection:\n   استخدم parameterized queries دائماً\n\n6. JWT Secrets قوية + انتهاء صلاحية قصير\n\n7. لا تُظهر stack traces في الـ production\n\n8. حدّث dependencies دورياً (npm audit)",
+        "difficulty": "advanced",
+        "tags": ["security", "express", "http"]
       },
       {
         "q": "ما الفرق بين process.nextTick و setImmediate و setTimeout(fn, 0)؟",
-        "a": "ترتيب التنفيذ:\n1. process.nextTick ← ينفّذ فوراً بعد انتهاء الكود الحالي (قبل Event Loop)\n2. Promise.then ← Microtask queue (بعد nextTick)\n3. setImmediate ← في مرحلة check من Event Loop\n4. setTimeout(fn, 0) ← في مرحلة timers (قد يكون بعد setImmediate)\n\nمثال:\nsetTimeout(() => console.log('timeout'), 0);\nsetImmediate(() => console.log('immediate'));\nprocess.nextTick(() => console.log('nextTick'));\nPromise.resolve().then(() => console.log('promise'));\n\nالنتيجة:\nnextTick → promise → immediate → timeout\n\nاستخدم process.nextTick بحذر — يمكن أن يُعيق Event Loop إذا أُسيء استخدامه"
+        "a": "ترتيب التنفيذ:\n1. process.nextTick ← ينفّذ فوراً بعد انتهاء الكود الحالي (قبل Event Loop)\n2. Promise.then ← Microtask queue (بعد nextTick)\n3. setImmediate ← في مرحلة check من Event Loop\n4. setTimeout(fn, 0) ← في مرحلة timers (قد يكون بعد setImmediate)\n\nمثال:\nsetTimeout(() => console.log('timeout'), 0);\nsetImmediate(() => console.log('immediate'));\nprocess.nextTick(() => console.log('nextTick'));\nPromise.resolve().then(() => console.log('promise'));\n\nالنتيجة:\nnextTick → promise → immediate → timeout\n\nاستخدم process.nextTick بحذر — يمكن أن يُعيق Event Loop إذا أُسيء استخدامه",
+        "difficulty": "advanced",
+        "tags": ["event-loop", "async"]
       },
       {
         "q": "ما هو Worker Threads وكيف يختلف عن Cluster؟",
-        "a": "Cluster:\n• يُنشئ processes مستقلة كاملة\n• كل process له memory منفصلة\n• مثالي لتوزيع HTTP requests\n\nWorker Threads:\n• خيوط داخل نفس الـ process\n• تشارك الـ memory (SharedArrayBuffer)\n• مثالي للـ CPU-intensive tasks\n\nconst { Worker } = require('worker_threads');\nconst worker = new Worker('./heavy-task.js');\nworker.on('message', (result) => console.log(result));\n\nمتى تستخدم كل؟\n• Cluster: scaling الـ API server\n• Worker Threads: معالجة صور، encryption، ML inference"
+        "a": "Cluster:\n• يُنشئ processes مستقلة كاملة\n• كل process له memory منفصلة\n• مثالي لتوزيع HTTP requests\n\nWorker Threads:\n• خيوط داخل نفس الـ process\n• تشارك الـ memory (SharedArrayBuffer)\n• مثالي للـ CPU-intensive tasks\n\nconst { Worker } = require('worker_threads');\nconst worker = new Worker('./heavy-task.js');\nworker.on('message', (result) => console.log(result));\n\nمتى تستخدم كل؟\n• Cluster: scaling الـ API server\n• Worker Threads: معالجة صور، encryption، ML inference",
+        "difficulty": "advanced",
+        "tags": ["clustering", "performance", "concurrency"]
+      },
+      {
+        "q": "ما الفرق بين I/O bound و CPU bound في Node.js وكيف تتعامل مع كل منهما؟",
+        "a": [
+          "I/O bound: المهمة تنتظر نظام التشغيل (قراءة ملف، query، طلب شبكة). الـ event loop يتعامل معها بكفاءة عالية دون threads إضافية، وهذا الشكل الطبيعي لخدمات Node.",
+          "CPU bound: المهمة تحسب داخل الـ JS thread (تشفير، معالجة صور، تحليل JSON ضخم). هنا يتوقف الـ event loop وتتأخر كل الطلبات الأخرى.",
+          "الحل للـ CPU bound: انقلها إلى Worker Threads أو عملية منفصلة، أو إلى خدمة أخرى عبر message queue.",
+          "الحل للـ I/O bound: لا تفعل شيئاً إضافياً، فالمقاربة غير المتزامنة القائمة على native fetch أفضل من أي بديل، وتجنّب المكتبات المتزامنة مثل bcrypt القديمة.",
+          "علامة تحذير عملية: إذا قِست event loop delay مرتفعاً، فالمشكلة غالباً blocking I/O أو حساب ثقيل وليس نقص موارد."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["performance", "event-loop", "async"]
       }
     ]
   },
@@ -199,43 +533,99 @@
     "questions": [
       {
         "q": "كيف يعمل Virtual DOM وما فائدته؟",
-        "a": "Virtual DOM = نسخة خفيفة من الـ DOM الحقيقي محفوظة في الذاكرة.\n\nكيف يعمل:\n1. عند تغيّر الـ state، React يبني Virtual DOM جديد\n2. يقارنه مع القديم (Diffing Algorithm)\n3. يُطبّق فقط التغييرات على الـ DOM الحقيقي (Reconciliation)\n\nالفائدة: تلاعب الـ DOM الحقيقي بطيء — Virtual DOM يُقلّل العمليات للحد الأدنى\n\nملاحظة: React 18 مع Concurrent Mode يُحسّن هذا أكثر بـ Time Slicing"
+        "a": "Virtual DOM = نسخة خفيفة من الـ DOM الحقيقي محفوظة في الذاكرة.\n\nكيف يعمل:\n1. عند تغيّر الـ state، React يبني Virtual DOM جديد\n2. يقارنه مع القديم (Diffing Algorithm)\n3. يُطبّق فقط التغييرات على الـ DOM الحقيقي (Reconciliation)\n\nالفائدة: تلاعب الـ DOM الحقيقي بطيء — Virtual DOM يُقلّل العمليات للحد الأدنى\n\nملاحظة: React 18 مع Concurrent Mode يُحسّن هذا أكثر بـ Time Slicing",
+        "difficulty": "beginner",
+        "tags": ["rendering", "dom", "performance"]
       },
       {
         "q": "ما الفرق بين useEffect و useLayoutEffect؟",
-        "a": "useEffect:\n• يُنفَّذ بعد أن يُرسَم الـ component للشاشة (asynchronously)\n• لا يُعيق الـ rendering\n• مناسب للـ: API calls، subscriptions، timers\n\nuseLayoutEffect:\n• يُنفَّذ بعد الـ DOM mutations لكن قبل أن يرى المستخدم التغيير (synchronously)\n• يُعيق الـ rendering حتى ينتهي\n• مناسب للـ: قراءة أبعاد الـ DOM، تعديلات بصرية فورية\n\nالقاعدة: استخدم useEffect دائماً إلا إذا لاحظت وميضاً بصرياً (flicker)"
+        "a": [
+          "useLayoutEffect ينفَّذ بعد تعديل الـ DOM لكن قبل أن يرى المستخدم التغيير، أي بشكل متزامن يمنع الوميض البصري (flicker).",
+          "useEffect ينفَّذ بعد أن يُرسَم الـ component فعلياً على الشاشة، فيلاحظه المستخدم ولا يعيق عملية الرسم.",
+          "الاستخدام الصحيح لـ useLayoutEffect: قراءة أبعاد عنصر، أو تعديل موضع يعتمد على قياس، أو أي تعديل بصري يجب أن يحدث قبل أول paint.",
+          "الاستخدام الصحيح لـ useEffect: كل ما لا علاقة له بالمتصفح مباشرة، مثل API calls و subscriptions و timers و analytics.",
+          "القاعدة: ابدأ بـ useEffect دائماً، وانتقل إلى useLayoutEffect فقط إذا رأيت وميضاً أو قياساً غير صحيح. الاستخدام الزائد له يعطل الرسم بلا داعي."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["react-hooks", "effects", "performance"]
       },
       {
         "q": "اشرح React Reconciliation و Fiber Architecture",
-        "a": "Reconciliation: عملية مقارنة الـ Virtual DOM القديم بالجديد لتحديد التغييرات\n\nقواعد Diffing:\n• عناصر من نوع مختلف → إعادة بناء كاملة\n• عناصر من نفس النوع → تحديث الخصائص فقط\n• key prop → يُساعد React على تتبع العناصر في القوائم\n\nReact Fiber (React 16+):\n• إعادة كتابة كاملة للـ reconciliation engine\n• يُقسّم العمل إلى وحدات صغيرة (fibers)\n• يدعم إيقاف العمل واستئنافه (Concurrent Features)\n• يُتيح: Suspense، Transitions، Time Slicing"
+        "a": "Reconciliation: عملية مقارنة الـ Virtual DOM القديم بالجديد لتحديد التغييرات\n\nقواعد Diffing:\n• عناصر من نوع مختلف → إعادة بناء كاملة\n• عناصر من نفس النوع → تحديث الخصائص فقط\n• key prop → يُساعد React على تتبع العناصر في القوائم\n\nReact Fiber (React 16+):\n• إعادة كتابة كاملة للـ reconciliation engine\n• يُقسّم العمل إلى وحدات صغيرة (fibers)\n• يدعم إيقاف العمل واستئنافه (Concurrent Features)\n• يُتيح: Suspense، Transitions، Time Slicing",
+        "difficulty": "advanced",
+        "tags": ["rendering", "reconciliation", "performance"]
       },
       {
         "q": "ما هو useMemo و useCallback ومتى تستخدمهما؟",
-        "a": "useMemo: يحفظ نتيجة حسابٍ ثقيل\nconst sorted = useMemo(() => heavySort(list), [list]);\n// يُعيد الحساب فقط إذا تغيّر list\n\nuseCallback: يحفظ دالة لمنع إعادة إنشائها\nconst handleClick = useCallback(() => {\n  doSomething(id);\n}, [id]);\n\nمتى تستخدمهما؟\n✅ دوال تُمرَّر كـ props لـ components محمية بـ React.memo\n✅ حسابات ثقيلة فعلاً (ترتيب، فلترة قوائم ضخمة)\n✅ dependencies في useEffect\n\n❌ لا تستخدمهما في كل مكان — التحسين المبكر مشكلة بحد ذاتها"
+        "a": "useMemo: يحفظ نتيجة حسابٍ ثقيل\nconst sorted = useMemo(() => heavySort(list), [list]);\n// يُعيد الحساب فقط إذا تغيّر list\n\nuseCallback: يحفظ دالة لمنع إعادة إنشائها\nconst handleClick = useCallback(() => {\n  doSomething(id);\n}, [id]);\n\nمتى تستخدمهما؟\n✅ دوال تُمرَّر كـ props لـ components محمية بـ React.memo\n✅ حسابات ثقيلة فعلاً (ترتيب، فلترة قوائم ضخمة)\n✅ dependencies في useEffect\n\n❌ لا تستخدمهما في كل مكان — التحسين المبكر مشكلة بحد ذاتها",
+        "difficulty": "intermediate",
+        "tags": ["react-hooks", "performance", "memoization"]
       },
       {
         "q": "ما هو React.memo وكيف يختلف عن useMemo؟",
-        "a": "React.memo: يمنع إعادة render الـ component إذا لم تتغيّر الـ props\nconst MyComponent = React.memo(({ name }) => {\n  return <div>{name}</div>;\n});\n\nuseMemo: يحفظ نتيجة حساب داخل component\n\nالفرق:\n• React.memo → يحفظ الـ component نفسه\n• useMemo → يحفظ قيمة داخل الـ component\n\nمشكلة شائعة:\nReact.memo بلا فائدة إذا مررت object أو function جديدة في كل render\nالحل: استخدم useMemo/useCallback مع props التي تُمرّرها"
+        "a": [
+          "React.memo يمنع إعادة render الـ component إذا لم تتغيّر الـ props (بمقارنة shallow). يُستخدم على مستوى التعريف: const C = React.memo(MyComponent).",
+          "useMemo يحفظ قيمة وليس component، داخل component قيد التنفيذ. فالاختلاف في المستوى: memo يعمل على حدود الـ component، و useMemo يعمل داخله.",
+          "الفروق العملية: memo يهتم بقيمة الـ props فقط، بينما useMemo يمكن أن يحفظ أي قيمة محسوبة أو حتى object بأمان.",
+          "الفخ الشائع: React.memo بلا فائدة إن مررت object أو function جديدة في كل render، والحل استخدام useMemo أو useCallback على هذه الـ props.",
+          "قاعدة عملية: memo مخصص للـ components الثقيلة أو التي تُعاد في قوائم طويلة، وليس غطاءً لغياب تنظيم سليم للـ state."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["memoization", "react-hooks", "performance"]
       },
       {
         "q": "ما هو Context API وما حدوده مقارنةً بـ Redux؟",
-        "a": "Context API:\n• مناسب لبيانات قليلة التغيير: theme، language، user\n• بسيط بدون مكتبات إضافية\n• مشكلة: كل consumer يُعاد render عند أي تغيير في الـ context\n\nRedux (أو Zustand/Jotai):\n• مناسب لـ state معقد وكثير التغيير\n• DevTools ممتازة لتتبع التغييرات\n• Selectors تمنع re-renders غير ضرورية\n• أثقل في الـ boilerplate\n\nالتوجه الحديث:\n• Zustand أو Jotai بدلاً من Redux للتبسيط\n• Context للـ static/slow-changing data فقط"
+        "a": [
+          "Context API مناسب لبيانات قليلة التغيير ومحدودة الحجم (theme، language، بيانات المستخدم)، وبسيط بلا مكتبات إضافية ولا boilerplate.",
+          "الحد الأساسي: أي تغيّر في الـ value يعيد render لكل الـ consumers في الشجرة، ولا توجد آلية تختار جزءاً من الـ value فقط.",
+          "Redux أو Zustand أو Jotai: مناسبات للـ state المعقد كثير التغيير، وتقدّم DevTools ممتازة لتتبع كل dispatch والتاريخ الزمني.",
+          "الميزة الحاسمة للحلول الحديثة: selectors تمنع re-renders غير الضرورية، والـ state يمكن الوصول إليه خارج شجرة الـ components.",
+          "التوجه العملي: Context للبيانات static أو بطيئة التغير فقط، و Zustand أو React Query للـ client state وللـ server state كلٍّ على حدة."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["state-management", "context", "react-hooks"]
       },
       {
         "q": "كيف تتعامل مع Code Splitting و Lazy Loading؟",
-        "a": "Code Splitting: تقسيم الـ bundle إلى أجزاء تُحمّل عند الحاجة\n\nReact.lazy + Suspense:\nconst Dashboard = React.lazy(() => import('./Dashboard'));\n\nfunction App() {\n  return (\n    <Suspense fallback={<Spinner />}>\n      <Dashboard />\n    </Suspense>\n  );\n}\n\nRoute-based splitting (أفضل استراتيجية):\nكل صفحة/route لها bundle منفصل\n\nDynamic imports:\nconst chart = await import('heavy-chart-lib');\n\nالفائدة: تسريع Initial Load Time بشكل كبير"
+        "a": "Code Splitting: تقسيم الـ bundle إلى أجزاء تُحمّل عند الحاجة\n\nReact.lazy + Suspense:\nconst Dashboard = React.lazy(() => import('./Dashboard'));\n\nfunction App() {\n  return (\n    <Suspense fallback={<Spinner />}>\n      <Dashboard />\n    </Suspense>\n  );\n}\n\nRoute-based splitting (أفضل استراتيجية):\nكل صفحة/route لها bundle منفصل\n\nDynamic imports:\nconst chart = await import('heavy-chart-lib');\n\nالفائدة: تسريع Initial Load Time بشكل كبير",
+        "difficulty": "intermediate",
+        "tags": ["code-splitting", "performance", "bundling"]
       },
       {
-        "q": "ما هو الفرق بين Controlled و Uncontrolled Components؟",
-        "a": "Controlled Component:\nالـ state في React يتحكم بقيمة الـ input\n<input value={name} onChange={e => setName(e.target.value)} />\n✅ مصدر حقيقة واحد، تحقق فوري، سهل الاختبار\n\nUncontrolled Component:\nالـ DOM يتحكم بالقيمة، نقرأها بـ ref\nconst inputRef = useRef();\n<input ref={inputRef} />\nconst value = inputRef.current.value;\n✅ أبسط للنماذج غير المعقدة\n❌ أصعب في التحقق الفوري\n\nReact Hook Form: يستخدم Uncontrolled internally للأداء لكن يوفر واجهة Controlled"
+        "q": "ما الفرق بين Controlled و Uncontrolled Components؟",
+        "a": [
+          "Controlled Component: الـ state في React هو مصدر الحقيقة للـ input، فكل حرف يكتبه المستخدم يُطلق onChange وبدورة render كاملة.",
+          "Uncontrolled Component: الـ DOM هو من يتحكم بالقيمة، وتقرأها عند الحاجة عبر ref، وهو أقل إعادة render وأسرع للنماذج الكبيرة.",
+          "متى تستخدم كلاً منهما؟ Controlled للنماذج التي تحتاج تحققاً فورياً وربطاً بين حقول، و Uncontrolled للنماذج البسيطة.",
+          "المشكلة الشائعة في Uncontrolled: الوصول للقيمة عند الإرسال غير متزامن، فالحل هو form مع FormData أو قراءة الـ refs داخل onSubmit.",
+          "React Hook Form يجمع أفضل الاثنتين: يعمل Uncontrolled داخلياً للأداء، لكنه يوفّر واجهة شبيهة بـ Controlled مع validation دقيق."
+        ],
+        "difficulty": "beginner",
+        "tags": ["forms", "react-hooks", "components"]
       },
       {
         "q": "ما هو Suspense و Concurrent Mode في React 18؟",
-        "a": "Concurrent Mode: React يستطيع إيقاف وإستئناف وإلغاء الـ rendering\n\nالميزات الجديدة في React 18:\n• useTransition: تمييز updates غير عاجلة\n  const [isPending, startTransition] = useTransition();\n  startTransition(() => setFilter(value));\n\n• useDeferredValue: تأجيل تحديث قيمة\n  const deferred = useDeferredValue(searchTerm);\n\n• Automatic Batching: تجميع setStates تلقائياً حتى في async\n\nSuspense للبيانات (مع frameworks):\n<Suspense fallback={<Loading />}>\n  <DataComponent /> {/* يُعلّق حتى تُحمّل البيانات */}\n</Suspense>"
+        "a": "Concurrent Mode: React يستطيع إيقاف وإستئناف وإلغاء الـ rendering\n\nالميزات الجديدة في React 18:\n• useTransition: تمييز updates غير عاجلة\n  const [isPending, startTransition] = useTransition();\n  startTransition(() => setFilter(value));\n\n• useDeferredValue: تأجيل تحديث قيمة\n  const deferred = useDeferredValue(searchTerm);\n\n• Automatic Batching: تجميع setStates تلقائياً حتى في async\n\nSuspense للبيانات (مع frameworks):\n<Suspense fallback={<Loading />}>\n  <DataComponent /> {/* يُعلّق حتى تُحمّل البيانات */}\n</Suspense>",
+        "difficulty": "advanced",
+        "tags": ["concurrency", "react-hooks", "suspense"]
       },
       {
         "q": "ما هي Custom Hooks وكيف تصممها؟",
-        "a": "Custom Hook = دالة تبدأ بـ use وتحتوي hooks أخرى، تُعيد استخدام الـ stateful logic.\n\nمثال — useFetch:\nfunction useFetch(url) {\n  const [data, setData] = useState(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    fetch(url)\n      .then(r => r.json())\n      .then(setData)\n      .catch(setError)\n      .finally(() => setLoading(false));\n  }, [url]);\n\n  return { data, loading, error };\n}\n\n// الاستخدام:\nconst { data, loading } = useFetch('/api/users');\n\nأمثلة شائعة: useDebounce، useLocalStorage، useWindowSize، useIntersectionObserver"
+        "a": "Custom Hook = دالة تبدأ بـ use وتحتوي hooks أخرى، تُعيد استخدام الـ stateful logic.\n\nمثال — useFetch:\nfunction useFetch(url) {\n  const [data, setData] = useState(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    fetch(url)\n      .then(r => r.json())\n      .then(setData)\n      .catch(setError)\n      .finally(() => setLoading(false));\n  }, [url]);\n\n  return { data, loading, error };\n}\n\n// الاستخدام:\nconst { data, loading } = useFetch('/api/users');\n\nأمثلة شائعة: useDebounce، useLocalStorage، useWindowSize، useIntersectionObserver",
+        "difficulty": "intermediate",
+        "tags": ["react-hooks", "code-reuse", "patterns"]
+      },
+      {
+        "q": "ما الفرق بين useState و useReducer ومتى تستخدم كل منهما؟",
+        "a": [
+          "useState مناسب للحالة البسيطة المستقلة (boolean، string، رقم) والتحديثات الصغيرة والموضعية.",
+          "useReducer مناسب للحالة المعقدة أو التي تتغير بأفعال محددة مسماة، وتكون فيها كل حالة ممكنة case واضحاً داخل الـ reducer.",
+          "الفارق الجوهري: useReducer يجمع كل تحديثات الحالة في مكان واحد ويسهل تتبع التدفق، ويتيح اختبار الـ reducer كدالة نقية بدون React.",
+          "متى تنتقل إلى useReducer؟ عندما تبدأ بوصول setState متعدد في نفس المكان، أو عندما تعتمد الحالة السابقة على نفسها بشكل متشابك.",
+          "لا تبالغ: useReducer ليس أداة لفرض نمط معماري، و useState يكفي لأغلب المكونات. الانتقال قبل أن يصبح الكود معقداً فعلاً قرار مبكر خاطئ."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["react-hooks", "state-management", "patterns"]
       }
     ]
   },
@@ -247,43 +637,105 @@
     "questions": [
       {
         "q": "كيف يعمل React Native — ما هو Bridge وما بعده؟",
-        "a": "Architecture القديمة (Bridge):\nJS Thread ←→ Bridge (JSON serialization) ←→ Native Thread\nالمشكلة: الـ Bridge يُسبّب تأخيراً وازدحاماً خصوصاً في الـ animations\n\nArchitecture الجديدة (New Architecture - RN 0.71+):\n• JSI (JS Interface): تواصل مباشر بين JS وـ C++ بدون serialization\n• Fabric: renderer جديد أسرع (synchronous)\n• TurboModules: تحميل Native Modules عند الطلب فقط\n• Codegen: توليد كود آمن من TypeScript specs\n\nالنتيجة: أداء أقرب للـ native، رسوم متحركة أسلس"
+        "a": [
+          "المعمارية القديمة (Bridge): تمر البيانات بين JS thread و Native thread عبر JSON serialization، ما يسبب تأخيراً وازدحاماً خصوصاً في الحركات المتكررة.",
+          "المعمارية الجديدة (New Architecture منذ RN 0.71): تعتمد JSI (JS Interface) للتواصل المباشر مع C++ بدون serialization، فينخفض زمن استدعاء الـ native بشكل حاسم.",
+          "Fabric: نظام renderer جديد يعتمد multithreading ويتيح الوصول المتزامن للـ UI thread من عدة threads.",
+          "TurboModules: تحميل الـ native modules عند الطلب فقط، مع codegen يولّد كوداً آمناً ومُتحقَّق منه من TypeScript specs.",
+          "النتيجة العملية: رسوم متحركة أنعم وأداء أقرب للـ native. التكلفة أن الترقية تتطلب مراجعة الكود الذي يعتمد على bridge serialization."
+        ],
+        "difficulty": "advanced",
+        "tags": ["native-modules", "architecture", "performance"]
       },
       {
         "q": "ما الفرق بين React Native CLI و Expo؟",
-        "a": "Expo:\n✅ إعداد سريع، بدون Xcode/Android Studio\n✅ OTA Updates (تحديث بدون App Store)\n✅ مكتبات جاهزة (camera, location...)\n❌ حجم تطبيق أكبر\n❌ محدودية في Native modules مخصصة\n❌ Expo Go له قيود في الـ production\n\nReact Native CLI:\n✅ تحكم كامل في الـ native code\n✅ أي native library\n✅ حجم تطبيق أصغر\n❌ يحتاج إعداد Xcode + Android Studio\n❌ أصعب في البداية\n\nالتوصية: Expo (Bare Workflow) — تجمع بين مزايا الاثنين"
+        "a": [
+          "Expo: إعداد سريع بدون Xcode أو Android Studio، ومكتبات جاهزة (camera، location)، ودعم OTA Updates لتحديثات فورية. عيوبه: حجم تطبيق أكبر، ومحدودية في الـ native modules المخصصة، وقيود في Expo Go للإنتاج.",
+          "React Native CLI: تحكم كامل في الـ native code وإمكانية استخدام أي native library، وحجم تطبيق أصغر. عيوبه: يحتاج إعداد Xcode و Android Studio ووقتاً أطول.",
+          "الفرق الجوهري تقنياً: Expo يبني على managed workflow وحزم مُغلّفة، بينما CLI يبني المشروع من الصفر داخل نظام البناء الأصلي (Gradle / Xcode).",
+          "EAS Build حل وسط ممتاز يمنح prebuild وبناء عن بُعد، فلا تحتاج mac مجهز للعمل اليومي وتبقى مرونة الـ native متاحة عند الحاجة.",
+          "متى تختار أيهما؟ مشروع أخضر أو prototype = Expo. متطلب native محدد أو حجم تطبيق حرج أو نظام بناء مخصص = CLI."
+        ],
+        "difficulty": "beginner",
+        "tags": ["tooling", "build", "workflow"]
       },
       {
         "q": "كيف تُحسّن أداء React Native؟",
-        "a": "1. FlatList بدلاً من ScrollView للقوائم الطويلة:\n   keyExtractor، getItemLayout، initialNumToRender\n\n2. Hermes Engine: تفعيله لتسريع JS execution وتقليل الـ memory\n\n3. تجنّب Anonymous Functions في render:\n   // ❌ onPress={() => handle(item)}\n   // ✅ const handlePress = useCallback(...)\n\n4. useNativeDriver: true في الـ animations\n\n5. InteractionManager: تأجيل العمليات الثقيلة بعد الـ animation\n\n6. React.memo + useMemo للـ components الثقيلة\n\n7. Reanimated 2: animations تعمل على UI Thread مباشرة\n\n8. تقليل bridge calls في الـ loops"
+        "a": "1. FlatList بدلاً من ScrollView للقوائم الطويلة:\n   keyExtractor، getItemLayout، initialNumToRender\n\n2. Hermes Engine: تفعيله لتسريع JS execution وتقليل الـ memory\n\n3. تجنّب Anonymous Functions في render:\n   // ❌ onPress={() => handle(item)}\n   // ✅ const handlePress = useCallback(...)\n\n4. useNativeDriver: true في الـ animations\n\n5. InteractionManager: تأجيل العمليات الثقيلة بعد الـ animation\n\n6. React.memo + useMemo للـ components الثقيلة\n\n7. Reanimated 2: animations تعمل على UI Thread مباشرة\n\n8. تقليل bridge calls في الـ loops",
+        "difficulty": "intermediate",
+        "tags": ["performance", "rendering", "lists"]
       },
       {
         "q": "ما هو Metro Bundler وكيف يعمل؟",
-        "a": "Metro هو الـ JavaScript bundler الخاص بـ React Native (مثل Webpack).\n\nمهامه:\n• يجمع كل ملفات JS والـ assets في bundle واحد\n• يدعم Fast Refresh (تحديث فوري بدون فقدان الـ state)\n• يحوّل JSX و TypeScript\n• يدير الـ module resolution\n\nالتحسينات:\n• RAM Bundles: تحميل modules عند الطلب (للتطبيقات الكبيرة)\n• Inline Requires: تأجيل تحميل الـ modules\n• Source Maps للـ debugging"
+        "a": "Metro هو الـ JavaScript bundler الخاص بـ React Native (مثل Webpack).\n\nمهامه:\n• يجمع كل ملفات JS والـ assets في bundle واحد\n• يدعم Fast Refresh (تحديث فوري بدون فقدان الـ state)\n• يحوّل JSX و TypeScript\n• يدير الـ module resolution\n\nالتحسينات:\n• RAM Bundles: تحميل modules عند الطلب (للتطبيقات الكبيرة)\n• Inline Requires: تأجيل تحميل الـ modules\n• Source Maps للـ debugging",
+        "difficulty": "intermediate",
+        "tags": ["bundling", "tooling", "debugging"]
       },
       {
         "q": "كيف تتعامل مع Navigation في React Native؟",
-        "a": "React Navigation (الأكثر شيوعاً):\n\nأنواع الـ Navigators:\n• Stack Navigator: شاشات فوق بعض (push/pop)\n• Tab Navigator: تبويبات سفلية\n• Drawer Navigator: قائمة جانبية\n• Bottom Sheet Navigator\n\nأفضل ممارسات:\n• nested navigators للتطبيقات المعقدة\n• navigationRef للتنقل خارج الـ components\n• Deep Linking لفتح شاشات من links خارجية\n• TypeScript مع typed params لمنع الأخطاء\n\nالبديل: Expo Router (file-based routing مثل Next.js)"
+        "a": [
+          "Stack Navigator: شاشات فوق بعضها (push/pop)، وهو الأساس لأي flow متدرج، مع إمكانية تخصيص الـ transition بين الشاشات.",
+          "Tab Navigator: تبويبات سفلية للتنقل بين أقسام رئيسية متوازية مع الحفاظ على state كل قسم.",
+          "Drawer Navigator: قائمة جانبية منزلقة، أقل شيوعاً في تطبيقات mobile الحديثة لكنه مفيد للتفاصيل الإدارية.",
+          "React Navigation v6+ يعتمد على native stack primitives وهو الأنسب لأداء native حقيقي وحركات سلسة.",
+          "أفضل الممارسات: استخدم typed params مع TypeScript لمنع أخطاء التنقل، و navigationRef للتنقل خارج شجرة الـ components، و Deep Linking لفتح شاشة مباشرة من رابط."
+        ],
+        "difficulty": "beginner",
+        "tags": ["navigation", "routing", "tooling"]
       },
       {
         "q": "ما الفرق بين StyleSheet.create و inline styles؟",
-        "a": "Inline styles:\n<View style={{ flex: 1, backgroundColor: 'red' }} />\n• object جديد في كل render\n• أبطأ قليلاً\n\nStyleSheet.create:\nconst styles = StyleSheet.create({ container: { flex: 1 } });\n<View style={styles.container} />\n\nالمزايا:\n• يُنشأ مرة واحدة ويُخزَّن\n• validation في development\n• إرسال الـ ID بدلاً من الـ object عبر Bridge (في الـ old architecture)\n• أسرع وأنظف\n\nملاحظة: لا تفرق كبيرة في الـ new architecture، لكن StyleSheet لا يزال الممارسة الأفضل للنظافة"
+        "a": [
+          "Inline styles تنشئ object جديداً في كل render، وهي مشكلة أداء حقيقية في القوائم الطويلة لأنها تمنع المقارنة المرجعية.",
+          "StyleSheet.create ينشئ الأنماط مرة واحدة ويُخزّنها، ويُرجع ID يُستخدم لاحقاً، مع validation في development وتحذير عند كتابة مفاتيح غير موجودة.",
+          "الأداء: في المعمارية القديمة كان إرسال الـ ID بدلاً من الـ object عبر Bridge يوفّر فرقاً واضحاً، وفي New Architecture الفرق أقل وضوحاً.",
+          "الـ Platform-specific styles متاحة داخل StyleSheet عبر Platform.select، فلا حاجة لملفات منفصلة لمجرد فرق بصري بسيط.",
+          "خلاصة عملية: StyleSheet هو الممارسة الافتراضية الصحيحة، و inline styles مقبولة فقط للقيم الديناميكية التي لا يمكن حسابها مسبقاً."
+        ],
+        "difficulty": "beginner",
+        "tags": ["styling", "rendering", "performance"]
       },
       {
         "q": "كيف تتعامل مع الـ Platform Differences؟",
-        "a": "Platform module:\nimport { Platform } from 'react-native';\n\nconst styles = {\n  padding: Platform.OS === 'ios' ? 20 : 16,\n  ...Platform.select({\n    ios: { shadowColor: '#000' },\n    android: { elevation: 4 },\n  }),\n};\n\nPlatform-specific files:\nComponent.ios.js  ← يُحمَّل على iOS\nComponent.android.js  ← يُحمَّل على Android\n\nSafe Area:\nimport { useSafeAreaInsets } from 'react-native-safe-area-context';\n// للتعامل مع notch وـ home indicator\n\nStatusBar: ضبطها لكل شاشة حسب الـ design"
+        "a": "Platform module:\nimport { Platform } from 'react-native';\n\nconst styles = {\n  padding: Platform.OS === 'ios' ? 20 : 16,\n  ...Platform.select({\n    ios: { shadowColor: '#000' },\n    android: { elevation: 4 },\n  }),\n};\n\nPlatform-specific files:\nComponent.ios.js  ← يُحمَّل على iOS\nComponent.android.js  ← يُحمَّل على Android\n\nSafe Area:\nimport { useSafeAreaInsets } from 'react-native-safe-area-context';\n// للتعامل مع notch وـ home indicator\n\nStatusBar: ضبطها لكل شاشة حسب الـ design",
+        "difficulty": "intermediate",
+        "tags": ["platform", "tooling", "ui"]
       },
       {
         "q": "ما هو Reanimated وكيف يختلف عن Animated API؟",
-        "a": "Animated API (built-in):\n• الـ animations تعمل على JS Thread\n• إذا كان الـ JS thread مشغولاً → animation تتأتأ\n• useNativeDriver: true يحسّن الوضع لكن مع قيود\n\nReact Native Reanimated 2:\n• الـ animations تعمل على UI Thread مباشرة (بلا bridge)\n• أداء مثالي حتى مع JS thread مشغول\n• worklets: كود JS يعمل على UI Thread\n\nمثال:\nconst offset = useSharedValue(0);\nconst animatedStyles = useAnimatedStyle(() => ({\n  transform: [{ translateX: offset.value }],\n}));\n\nGesture Handler: يُكمل Reanimated لـ gestures سلسة"
+        "a": [
+          "Animated API المدمج: الحركات تعمل على JS thread، فإذا كان الـ JS thread مشغولاً بطلب شبكة أو حساب، تتأخر الحركة بشكل ملحوظ.",
+          "useNativeDriver: true ينقل بعض الحركات إلى native thread ويحسّن الوضع، لكنه لا يدعم كل الخصائص مثل تغيير ارتفاع عنصر أو بعض قيم الألوان.",
+          "Reanimated 2: يكتب الحركات بالكامل على UI thread عبر worklets، أي كود JS يُنزَّل ويعمل هناك مباشرة بلا تواصل مع JS thread.",
+          "النتيجة: أداء ثابت حتى لو كان الـ JS thread مشغولاً، وهو الخيار المعتمد لأي حركة تفاعلية حساسة مثل السحب وتتبع الإصبع.",
+          "Gesture Handler يتكامل مع Reanimated عبر shared values لتعطيك gestures سلسة كالسحب والتكبير مباشرة على الـ UI thread."
+        ],
+        "difficulty": "advanced",
+        "tags": ["animations", "performance", "native-modules"]
       },
       {
         "q": "كيف تتعامل مع الـ State Management في React Native؟",
-        "a": "نفس خيارات React مع اعتبارات إضافية:\n\nللـ state البسيط: useState + Context\n\nللـ state المعقد:\n• Zustand (الأخف والأبسط)\n• Redux Toolkit (للمشاريع الكبيرة)\n• Jotai/Recoil (atomic state)\n\nللـ Server State:\n• TanStack Query (React Query) — الأفضل للـ API calls\n• يدير caching، loading، error، refetching تلقائياً\n\nللـ Persistence (حفظ بين الجلسات):\n• AsyncStorage: بسيط، للبيانات الصغيرة\n• MMKV: أسرع بـ 10x من AsyncStorage (مُوصى به)\n• WatermelonDB: قواعد بيانات معقدة"
+        "a": [
+          "للـ state البسيط داخل الشاشة: useState و useReducer تكفيان تماماً، ولا تستدعِ مكتبة خارجية قبل الحاجة الفعلية.",
+          "للـ state المعقد عبر الشاشات: Zustand هي الخيار الخفيف بأقل boilerplate، و Redux Toolkit للمشاريع الكبيرة التي تريد predictability و devtools.",
+          "للـ server state وهو الجزء الأهم: TanStack Query (React Query) هو الأنسب، فهو يدير caching و revalidation و loading و error و pagination تلقائياً.",
+          "للحفظ بين الجلسات: AsyncStorage بسيط للبيانات الصغيرة، بينما MMKV أسرع بكثير وهو المُوصى به في الإنتاج، و WatermelonDB للبيانات الضخمة المتزامنة.",
+          "نصيحة معمارية: لا تنسخ الـ server state يدوياً إلى الـ client state، فتدخل في حالة تعارض دائمة لأن المصدرين يفترضان تحديثين متعارضين."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["state-management", "storage", "react-hooks"]
       },
       {
         "q": "كيف تتعامل مع Push Notifications؟",
-        "a": "الأدوات:\n• Expo Notifications: الأسهل مع Expo\n• Firebase Cloud Messaging (FCM): Android + iOS\n• APNs: لـ iOS مباشرة\n\nالخطوات الأساسية:\n1. طلب إذن المستخدم\n2. الحصول على Device Token\n3. إرسال Token للـ backend\n4. Backend يرسل notification عبر FCM/APNs\n\nالتعامل مع الـ states:\n• Foreground: التطبيق مفتوح\n• Background: التطبيق في الخلفية\n• Quit: التطبيق مغلق تماماً\n\nكل state يحتاج معالجة مختلفة للـ notification"
+        "a": "الأدوات:\n• Expo Notifications: الأسهل مع Expo\n• Firebase Cloud Messaging (FCM): Android + iOS\n• APNs: لـ iOS مباشرة\n\nالخطوات الأساسية:\n1. طلب إذن المستخدم\n2. الحصول على Device Token\n3. إرسال Token للـ backend\n4. Backend يرسل notification عبر FCM/APNs\n\nالتعامل مع الـ states:\n• Foreground: التطبيق مفتوح\n• Background: التطبيق في الخلفية\n• Quit: التطبيق مغلق تماماً\n\nكل state يحتاج معالجة مختلفة للـ notification",
+        "difficulty": "intermediate",
+        "tags": ["push-notifications", "native-modules", "mobile"]
+      },
+      {
+        "q": "كيف تتعامل مع تخزين البيانات المحلية والـ offline-first؟",
+        "a": "اختر الأداة بالحجم: MMKV أو AsyncStorage للـ settings والـ tokens لأنها بيانات صغيرة ومتزامنة، و SQLite عبر WatermelonDB أو Expo SQLite للـ cached lists الكبيرة.\n\nمبدأ offline-first: القاعدة المحلية هي مصدر الحقيقة للـ UI، والسيرفر مجرد مصدر للمزامنة، فتعرض البيانات فوراً ثم تحدّث لاحقاً.\n\nالتصميم العملي: كل جدول محلي يحمل updated_at و deleted_at كـ soft markers، وبعد المزامنة تعلّم السجلات التي لم تعد موجودة على السيرفر بدل حذفها فوراً.\n\nتعارض الكتابة: استخدم updated_at مع last-write-wins للبيانات البسيطة،/conflict resolution صريح للعمليات الحرجة مثل المخزون أو نقل المال.\n\nمراقبة الحالة: أضف مؤشر online/offline، ولا ترسل تعديلات متعارضة عند انقطاع الشبكة، واجعل queue للتعديلات تُعاد إرسالها عند عودة الاتصال.",
+        "difficulty": "intermediate",
+        "tags": ["storage", "state-management", "reliability"]
       }
     ]
   },
@@ -295,15 +747,288 @@
     "questions": [
       {
         "q": "ما الفرق بين Unit Test و Feature Test و Integration Test؟",
-        "a": "Unit Test:\n• اختبار وحدة واحدة معزولة (method/class)\n• سريع جداً، لا يحتاج DB أو external services\n• يستخدم Mocking\n\nFeature Test (في Laravel):\n• اختبار feature كاملة من HTTP request لـ response\n• يستخدم DB الفعلية (عادة SQLite in-memory)\n• php artisan test\n\nIntegration Test:\n• اختبار تكامل عدة مكونات\n• أبطأ من Unit لكن أشمل\n\nالتوصية: اكتب Unit للـ business logic، Feature للـ API endpoints"
+        "a": [
+          "Unit Test: اختبار وحدة واحدة معزولة (method أو class) بسرعة عالية جداً، لا يحتاج DB أو خدمات خارجية، ويعتمد بشكل أساسي على Mocking للتبعيات.",
+          "Integration Test: اختبار تفاعل عدة مكونات حقيقية معاً (مثل repository مع قاعدة بيانات فعلية)، أبطأ لكنه يكشف مشاكل الربط التي لا يراها الـ unit test.",
+          "Feature Test (في Laravel): اختبار feature كاملة من HTTP request حتى response بما يشمل الـ routing والـ middleware والـ auth، ويستخدم قاعدة بيانات عادة SQLite in-memory.",
+          "مثال عملي على الفروق في نفس الـ feature: 401 بدون توكن، و 422 ببيانات غير صالحة، و 200 مع بيانات صحيحة، وكلها feature tests.",
+          "التوصية: اكتب Unit للـ business logic المجرد، و Integration لطبقة الـ persistence، و Feature للـ API endpoints والعقود العامة."
+        ],
+        "difficulty": "beginner",
+        "tags": ["testing", "unit-testing", "integration-testing"]
       },
       {
         "q": "ما هو SQL Injection وكيف تمنعه في Laravel؟",
-        "a": "SQL Injection: مهاجم يُدرج SQL code في input المستخدم\n\nمثال الهجوم:\nUsername: admin' OR '1'='1\n\nالحماية في Laravel:\n1. Eloquent ORM: محمي تلقائياً\n2. Query Builder مع bindings:\n   DB::select('SELECT * FROM users WHERE id = ?', [$id])\n3. لا تستخدم DB::raw() مع input المستخدم مباشرة\n\nأبداً لا تكتب:\nDB::select(\"SELECT * FROM users WHERE id = $id\") ❌"
+        "a": "SQL Injection: مهاجم يُدرج SQL code في input المستخدم\n\nمثال الهجوم:\nUsername: admin' OR '1'='1\n\nالحماية في Laravel:\n1. Eloquent ORM: محمي تلقائياً\n2. Query Builder مع bindings:\n   DB::select('SELECT * FROM users WHERE id = ?', [$id])\n3. لا تستخدم DB::raw() مع input المستخدم مباشرة\n\nأبداً لا تكتب:\nDB::select(\"SELECT * FROM users WHERE id = $id\") ❌",
+        "difficulty": "intermediate",
+        "tags": ["security", "sql-injection", "owasp"]
       },
       {
         "q": "ما هو XSS وكيف تحميه في Laravel؟",
-        "a": "XSS (Cross-Site Scripting): حقن JavaScript ضار في الصفحة\n\nفي Blade:\n• {{ $data }} → هروب تلقائي ✅\n• {!! $data !!} → بدون هروب (خطر!) ⚠️\n\nالحماية إضافية:\n• Content Security Policy headers\n• HttpOnly Cookies\n• Validate وSanitize كل input\n• استخدم {!! !!} فقط لـ HTML موثوق من نظامك"
+        "a": "XSS (Cross-Site Scripting): حقن JavaScript ضار في الصفحة\n\nفي Blade:\n• {{ $data }} → هروب تلقائي ✅\n• {!! $data !!} → بدون هروب (خطر!) ⚠️\n\nالحماية إضافية:\n• Content Security Policy headers\n• HttpOnly Cookies\n• Validate وSanitize كل input\n• استخدم {!! !!} فقط لـ HTML موثوق من نظامك",
+        "difficulty": "intermediate",
+        "tags": ["security", "xss", "owasp"]
+      },
+      {
+        "q": "ما هو Mocking و Faking في Laravel Tests ومتى تستخدم كل منهما؟",
+        "a": "Mocking: استبدال object Collaborator كاملاً لتوقع تفاعلات محددة معه، مثل External::shouldReceive('send')->once(). يُستخدم لإثبات أن المنطق يطلب الخدمة الصحيحة بالمعاملات الصحيحة.\n\nFaking: استبدال implementation حقيقية ببديل يسجّل السلوك بدل تنفيذه، مثل Mail::fake() و Http::fake() و Bus::fake() و Storage::fake().\n\nقاعدة اختيار عملية:\n• Mail و Http و Storage و Notifications → fakes، لأنها آثار جانبية لا نريد تنفيذها فعلاً.\n• Collaborators داخل الـ business logic → mocks، للتحقق من أن التفاعل يحدث كما هو متوقع.\n\nحذار من over-mocking: اختبار يتكون من mocks فقط لا يتحقق من أي سلوك حقيقي ويصبح صعب الصيانة. استخدم اختبارات unit للـ business logic، وللـ wiring من طرف إلى طرف اختبار feature صغير.",
+        "difficulty": "intermediate",
+        "tags": ["testing", "mocking", "unit-testing"]
+      },
+      {
+        "q": "ما هو TDD (Red-Green-Refactor) وهل ينفع في المشاريع الكبيرة؟",
+        "a": "دورة TDD:\n1. Red: اكتب اختباراً فاشلاً يصف السلوك المطلوب بدقة.\n2. Green: اكتب أبسط كود يجعل الاختبار ينجح، وقد يكون قبيحاً عمداً.\n3. Refactor: حسّن التصميم والتنظيف مع بقاء الاختبارات خضراء.\n\nلماذا ينجح؟ يفرض كتابة الـ API قبل تنفيذه، ويمنع التصميم المسبق بلا فهم، ويمنع إعادة الهيكلة لاحقاً بدون شبكة أمان.\n\nفي المشاريع الكبيرة: نعم لكنه ليس كل شيء. ضع TDD على الـ business logic والـ algorithms والحسابات، واستخدم Feature Tests للـ endpoints وسلوكيات الـ UI.\n\nالفخ الشائع: تحويل كل مشروع إلى اختبارات قبل أي كتابة فعلية ينتج واجهات مبهمة بلا حاجة. المعيار العملي هو الانضباط لا التسمية.",
+        "difficulty": "intermediate",
+        "tags": ["tdd", "testing", "design"]
+      },
+      {
+        "q": "لماذا تصبح بعض الـ Tests Flaky وكيف تتعامل معها؟",
+        "a": "الـ Flaky Test هو اختبار ينجح أحياناً ويفشل أحياناً على نفس الكود، وهو أخطر من اختبار يفشل دائماً لأنه يكسر الثقة في الـ CI.\n\nالأسباب الشائعة:\n• الاعتماد على الوقت: Date::now() أو timestamps دون تجميد الوقت، والحل هو Carbon::setTestNow().\n• الاعتماد على ترتيب التنفيذ أو على بيانات مشتركة بين الاختبارات.\n• طلبات شبكة حقيقية، أو استخدام sleep عشوائي بدل انتظار شرط حقيقي.\n• التزاحم على موارد مشتركة: نفس الـ port أو نفس الـ database أو نفس الـ Redis.\n• assertions ضعيفة لا تغطي السلوك غير المتزامن.\n\nالعلاج: اعزل كل اختبار بـ RefreshDatabase، وثبّت الزمن والعشوائية، واستبدل sleep بـ eventually assertions، واجعل الاختبارات المتوازية تستخدم قواعد بيانات منفصلة. وللخدمات الخارجية استخدم fakes بدل الاتصال الحقيقي.",
+        "difficulty": "advanced",
+        "tags": ["testing", "ci-cd", "debugging"]
+      },
+      {
+        "q": "هل نسبة الـ Test Coverage مهمة؟ وما فخاخها؟",
+        "a": "التغطية ليست هدفاً بحد ذاتها، بل إشارة إلى أجزاء غير مُختبَرة. نسبة 100% قد تعني اختبارات assertions ضعيفة تمر دائماً.\n\nفخاخ رئيسية:\n• النسبة وحدها لا تكشف قوة الاختبار، فسطر يُقرأ بلا assertion يمر بنجاح دون أي تحقق.\n• تغطية الكود لا تغطي الـ business requirements ولا الـ edge cases الفعلية.\n• فخ الـ coverage cliff: كل سطر جديد يخفض النسبة، فتُضغط المجموعة لتجاهل الاختبارات أو لتقليل معاييرها.\n\nالأفضل: استخدم line و branch metrics للتركيز على الكود الحيوي، و mutation testing للتحقق من قوة الاختبارات فعلياً لا من عددها.\n\nفي Laravel: التغطية عبر phpunit --coverage-html مع Xdebug أو PCOV، وحدّد max على الكود القديم لمنع تراجع النسبة.",
+        "difficulty": "intermediate",
+        "tags": ["coverage", "testing", "code-quality"]
+      },
+      {
+        "q": "ما هو CSRF وكيف تحمي منه؟",
+        "a": "CSRF (Cross-Site Request Forgery): مهاجم يحقن موقعك ليرسل طلباً من متصفح الضحية بدون علمها، فتُنفَّذ العملية بحسابها لأن الـ session cookie يُرسَل تلقائياً مع كل طلب.\n\nمثال: زر مخفي يرسل POST إلى /transfer في صفحة مهاجم، ومتصفح الضحية يضيف الـ session cookie، فيُحوَّل المبلغ فعلاً.\n\nالحماية في Laravel:\n1. Middleware باسم VerifyCsrfToken مفعّل افتراضياً ويضع _token في كل form.\n2. عند فشل التحقق يعيد 419، مع إبقاء الجلسات قصيرة الصلاحية.\n3. في تطبيقات SPA مع Sanctum: أرسل csrf cookie ثم أرسله في header باسم X-XSRF-TOKEN.\n4. تطبيقات Mobile التي تستخدم Bearer tokens ولا ترسل cookies أصلاً ليست معرضة لـ CSRF.\n\nمفتاح الفهم: HTTPS و SameSite=Lax على الـ cookies يقللان الخطر، لكنهما ليسا بديلاً عن التوكن نفسه.",
+        "difficulty": "intermediate",
+        "tags": ["security", "csrf", "owasp"]
+      },
+      {
+        "q": "ما هي أخطاء JWT الشائعة وكيف تتجنبها؟",
+        "a": [
+          "القبول بخوارزمية يحددها المهاجم (خوارزمية none) أو استخدام خوارزمية ضعيفة: ثبّت الخوارزمية في التحقق واستخدم RS256 أو EdDSA.",
+          "secret ضعيف أو مكتوب في الكود: استخدم متغيرات بيئة قوية، وأدار الأسرار عبر Vault أو AWS Secrets Manager مع تدوير دوري.",
+          "الخلط بين Authentication و Authorization: الـ token يثبت الهوية فقط، فافحص الصلاحيات وملكية المورد في كل endpoint ولا تعتمد على الـ claims وحدها.",
+          "عدم التعامل مع expiry و revocation: استخدم access token قصير الصلاحية مع refresh token، وقائمة إبطال تُمسح منها التوكنات عند logout أو تغيير كلمة المرور.",
+          "ضعف claims: اربط الـ token بـ audience و issuer لمنع إعادة استخدامه في خدمة أخرى (token confusion)، ولا تثق بأي claim قبل التحقق من التوقيع."
+        ],
+        "difficulty": "advanced",
+        "tags": ["security", "jwt", "authentication"]
+      },
+      {
+        "q": "كيف تخزّن كلمات المرور بشكل آمن؟",
+        "a": "1. استخدم خوارزمية hashing مخصصة للكلمات المرور مثل bcrypt أو Argon2id، وليس MD5 أو SHA1 أو SHA256 المجردة لأنها سريعة وقابلة للكسر بالقوة الغاشمة.\n2. الـ salts مدمجة في الخوارزمية، فلا تخزن salt بنفسك ولا تعيد استخدامه بين كلمات المرور.\n3. اضبط work factor (cost) بشكل متدرج مع تحسّن العتاد، فمعيار قديم يصبح ضعيفاً على أجهزة حديثة.\n4. أضف rate limiting على login ومحاولات استعادة كلمة المرور لمنع Attacks القاموة.\n5. نفّذ سياسات كلمة المرور: طول أدنى معقول، واستخدم مدير كلمات مرور أو SSO إن أمكن، وتجنّب الأسئلة السرية.\n6. بعد تسجيل الدخول، أعد hashing لكلمات المرور بمعاملات معايير أحدث عبر rehash شفاف.\n7. في Laravel: Hash::make() و Hash::check()، والتحقق من strength عبر Password::min(12)->mixedCase()->numbers() في الـ validation.",
+        "difficulty": "intermediate",
+        "tags": ["security", "password-hashing", "authentication"]
+      },
+      {
+        "q": "ما هو OAuth2 / OIDC وما الفرق بين Authorization Code و Implicit flow؟",
+        "a": "Authorization Code Flow: السيرفر يحوّل authorization code إلى access token عبر back channel باستخدام client secret مع PKCE. هو الخيار الآمن للتطبيقات التي لها backend.\n\nImplicit Flow: الـ token يُرجع في fragment من الرابط مباشرة، فيتعرض لهجمات XSS ولاعتراض التوكنات، وهو مهجور بالكامل في OAuth 2.1.\n\nPKCE (Proof Key for Code Exchange): يضيف code_verifier عشوائياً من تطبيق عام (SPA أو Mobile) فيثبت أن المرسل هو من بدأ الطلب، ويجعل Code flow آمناً بدون client secret.\n\nOIDC فوق OAuth2: طبقة identity فوق OAuth2 تُعيد id_token موقّعاً بصيغة JWT يثبت هوية المستخدم، بينما access token نفسه يخص التصريح فقط لا الهوية.\n\nالخلاصة العملية: استخدم Authorization Code + PKCE لكل شيء اليوم، ولا تستخدم Implicit مطلقاً، وخزّن التوكنات في HttpOnly cookies لا localStorage.",
+        "difficulty": "advanced",
+        "tags": ["oauth", "security", "authentication"]
+      }
+    ]
+  },
+  {
+    "id": "devops",
+    "label": "Docker & DevOps",
+    "icon": "🐳",
+    "color": "#2496ED",
+    "questions": [
+      {
+        "q": "ما الفرق بين Container و Virtual Machine؟",
+        "a": [
+          "Virtual Machine يشغّل نظام تشغيل كامل فوق hypervisor، فيحتاج GBs من الذاكرة ووقت إقلاع بالدقائق، لكن عزله قوي جداً على مستوى الـ hardware.",
+          "Container يشغّل عمليات التطبيق مباشرة على الـ host kernel بدون نظام تشغيل إضافي، فيحتاج MBs من الذاكرة ويُقلع خلال أجزاء من الثانية.",
+          "عزل الـ container يعتمد على Linux namespaces و cgroups وليس على hypervisor، فهو عزل منطقي على مستوى الـ kernel.",
+          "المقارنة العملية: VM مناسب لتشغيل أنظمة مختلفة أو تطبيقات جاهزة، و container مناسب لتطبيقاتك أنت حيث تريد اتساقاً كاملاً بين dev و production و startup سريع."
+        ],
+        "difficulty": "beginner",
+        "tags": ["docker", "containers", "virtualization"]
+      },
+      {
+        "q": "كيف تعمل Docker Image layers ولماذا يهم ترتيب الأوامر في الـ Dockerfile؟",
+        "a": "الـ Image سلسلة من layers read-only تتراكم، وكل أمر في الـ Dockerfile ينشئ layer جديداً فوق السابق، ويعمل التطبيق بحجم تراكمي (overlay filesystem).\n\nالنقطة الحرجة: بمجرد إنشاء layer لا يمكن تعديله. مثال خاطئ:\nFROM node:20\nCOPY . .\nRUN npm install   # أي تعديل في أي ملف يُبطل الكاش ويعيد التثبيت كله\n\nالترتيب الصحيح:\nCOPY package*.json .  # طبقة منفصلة\nRUN npm install       # تتأثر فقط عند تغيير package.json\nCOPY . .\n\nقواعد أخرى: ادمج أوامر RUN في طبقة واحدة لتفادي طبقات وسيطة، واستخدم .dockerignore لحجم أصغر، ولا تحفظ أسراراً داخل الـ image layers.",
+        "difficulty": "intermediate",
+        "tags": ["docker", "build", "performance"]
+      },
+      {
+        "q": "ما هو Multi-stage Build في Docker ولماذا يهم؟",
+        "a": "Multi-stage build يسمح ببناء التطبيق في صورة (build stage) غنية بالأدوات، ثم نسخ الناتج فقط إلى صورة نهائية صغيرة (runtime stage) بلا أدوات بناء.\n\nFROM node:20 AS build\nWORKDIR /app\nCOPY package*.json .\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:20-slim\nWORKDIR /app\nCOPY --from=build /app/dist ./dist\nCOPY --from=build /app/node_modules ./node_modules\nUSER node\nCMD [\"node\", \"server.js\"]\n\nالفوائد:\n• حجم أصغر بكثير فيسحب وينشر أسرع\n• سطح هجوم أقل، فلا compilers ولا git ولا shells في الإنتاج\n• الفصل بين بيئة البناء وبيئة التشغيل يضمن أن ما اختبرته هو ما ستنشره",
+        "difficulty": "intermediate",
+        "tags": ["docker", "build", "optimization"]
+      },
+      {
+        "q": "ما الفرق بين COPY و ADD و VOLUME في Dockerfile؟",
+        "a": [
+          "COPY: ينسخ الملفات والمجلدات من build context إلى الـ image، وهو الخيار الافتراضي والأفضل دائماً، ويدعم wildcards مثل COPY *.json ./.",
+          "ADD: مثل COPY لكن مع سلوكيات إضافية، فهو فك ضغط ملفات tar و gzip تلقائياً، وإن كان المصدر URL فحمّله من الإنترنت. استخدمه عند الحاجة الفعلية لفك الضغط فقط.",
+          "VOLUME: يعلن عن mount point داخل الـ image، فينشئ volume تلقائياً يحتفظ بالبيانات بعد حذف الـ container، لكنه لا يحدد الـ driver ولا يضمن الاستمرارية بمفرده.",
+          "الحكم العملي: COPY دائماً، و ADD نادراً عند الحاجة لفك ضغط، و VOLUME لتوضيح نية mount point فقط، بينما data الإنتاج تُدار بـ volumes في وقت التشغيل عبر docker volume create."
+        ],
+        "difficulty": "beginner",
+        "tags": ["docker", "build", "storage"]
+      },
+      {
+        "q": "ما هي أنواع Docker Networks ومتى تستخدم كل نوع؟",
+        "a": [
+          "bridge (الافتراضي): شبكة داخلية مع NAT تسمح بالاتصال بين containers على نفس الشبكة، وهو الخيار الافتراضي لأي تواصل بين services على نفس الـ host.",
+          "host: لا ينشئ شبكة معزولة إطلاقاً بل يستخدم interfaces الـ host مباشرة. أسرع لكنه يلغي العزل، ويُستخدم نادراً فقط.",
+          "none: تعطيل كل الاتصال الشبكي داخل الـ container، وهو مفيد للمهام المعزولة أو المهام التي تعمل offline.",
+          "overlay: شبكة موزعة تعمل عبر عدة hosts، وهي الأساس في Docker Swarm وتُستخدم مع plugins في البيئات متعددة السيرفرات.",
+          "القاعدة العملية: اعزل كل بيئة في network مخصصة، واستخدم اسم الـ service كـ DNS تلقائي، ولا تكتب عناوين IP ثابتة أبداً."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["docker", "networking", "containers"]
+      },
+      {
+        "q": "ما الفرق بين Volume و Bind Mount و tmpfs؟",
+        "a": [
+          "Volume: مجلد تديره Docker وتخزنه خارج دورة حياة الـ container، على قرص مملوك لـ Docker. هو الخيار الافتراضي لبيانات الإنتاج مثل قواعد البيانات و uploads.",
+          "Bind Mount: ربط مسار من الـ host مباشرة داخل الـ container. مناسب للتطوير لمشاركة الكود مع hot reload، لأنه لا ينسخ البيانات.",
+          "tmpfs: تخزين في الذاكرة RAM فقط، سريع جداً ومؤقت، ويختفي عند إيقاف الـ container. مثالي للملفات المؤقتة وقواعد بيانات الاختبارات.",
+          "الفرق الأهم عملياً: بيانات الـ Volume تنجو من حذف الـ container، أما الـ Bind Mount فأنت مسؤول عن نسخها الاحتياطية ومكانها.",
+          "قواعد الاستخدام: Production ثم volumes، والتطوير ثم bind mounts، والأسرع للبيانات المؤقتة ثم tmpfs، مع ضبط صلاحيات الـ user داخل الـ container لتجنب مشاكل القراءة."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["docker", "storage", "volumes"]
+      },
+      {
+        "q": "ما هو Docker Compose ومتى تستخدمه؟",
+        "a": "Docker Compose أداة تعرّف وتشغّل عدة containers معاً من ملف YAML واحد، بدل أوامر docker طويلة يدوياً لكل service.\n\nمثال (Laravel + MySQL + Redis):\nservices:\n  app:\n    build: .\n    depends_on: [db, redis]\n  db:\n    image: mysql:8\n    environment:\n      MYSQL_DATABASE: app\n    volumes: [db_data:/var/lib/mysql]\n  redis:\n    image: redis:7-alpine\n\nالأوامر: docker compose up -d، و logs، و down، و exec، و build.\n\nمتى تستخدمه؟ بيئة التطوير و CI وأي تطبيق متعدد الخدمات. أما في الإنتاج فاستخدم stacks أو Kubernetes، مع swarm للبيئات الصغيرة.",
+        "difficulty": "beginner",
+        "tags": ["docker", "devops", "tooling"]
+      },
+      {
+        "q": "ما الفرق بين CI و CD؟ وأعطني مثالاً لـ pipeline في مشروع Laravel؟",
+        "a": "CI (Continuous Integration): كل developer يدفع كوده، فيُبنى المشروع وتُشغّل الاختبارات تلقائياً لاكتشاف الأخطاء مبكراً قبل الدمج.\n\nCD (Continuous Delivery/Deployment): بعد نجاح CI يُنشر النظام تلقائياً إلى staging و production أو يجهّز للنشر.\n\nمثال pipeline عبر GitHub Actions لمشروع Laravel:\n1. الجودة: pint --test ثم PHPStan\n2. الاختبارات: php artisan test مع config و route cache\n3. البناء: docker build للـ API ثم push إلى registry\n4. النشر: migrations باستراتيجية zero-downtime ثم rolling update للـ containers\n5. ما بعد النشر: smoke tests و rollback تلقائي عند فشل الـ health check\n\nمفتاح النجاح: اجعل الـ pipeline سريعاً (أقل من 10 دقائق) وإلا سيتجاهله المطورون، واجعله يمنع merge الكود المكسور.",
+        "difficulty": "intermediate",
+        "tags": ["ci-cd", "devops", "deployment"]
+      },
+      {
+        "q": "ما الفرق بين Blue-Green Deployment و Canary Release؟",
+        "a": [
+          "Blue-Green: توجد نسختان كاملتان من التطبيق (blue الحالية و green الجديدة) خلف load balancer، وفي لحظة واحدة يُبدَّل كامل الـ traffic بينهما.",
+          "ميزة Blue-Green: rollback فوري بتبديل الـ weight فقط، وانقطاع شبه معدوم. عيبه: قد يضاعف تكلفة البنية التحتية، ويحتاج migrations متوافقة مع النسختين معاً.",
+          "Canary: يُطلق تغييراً صغيراً من الـ traffic (مثل 5%) إلى النسخة الجديدة، ثم تراقب الـ metrics وتزيد النسبة تدريجياً حتى 100%.",
+          "ميزة Canary: يكشف الأخطاء مبكراً بتأثير محدود، ومثالي لتجربة feature flags والإطلاقات التدريجية. عيبه: يحتاج مراقبة دقيقة وقد يبطئ الإطلاق.",
+          "متى تختار؟ Canary للتغييرات التي تتحمل مخاطرة تدريجية، و Blue-Green للإصدارات الكبيرة التي تحتاج rollback فوري مضمون."
+        ],
+        "difficulty": "advanced",
+        "tags": ["deployment", "ci-cd", "reliability"]
+      },
+      {
+        "q": "ما هي Health Checks و Liveness و Readiness probes في Kubernetes؟",
+        "a": "Liveness probe: هل العملية ما زالت حية؟ إذا فشل بشكل متكرر أعاد Kubernetes تشغيل الـ pod. يجب ألا يعتمد على الخدمات الخارجية (Redis مثلاً) وإلا حصلت إعادة تشغيل جماعية عند فشل عابر.\n\nReadiness probe: هل هذا pod جاهز لاستقبال traffic؟ إذا فشل، يُزال من service endpoints دون إعادة تشغيل، فتُوجَّه الطلبات لبود آخر.\n\nStartup probe: يمنع liveness من قتل التطبيق أثناء إقلاع بطيء، وهو مهم للتطبيقات الثقيلة.\n\nمثال:\nlivenessProbe:\n  httpGet: { path: /healthz, port: 8080 }\n  periodSeconds: 10\nreadinessProbe:\n  httpGet: { path: /ready, port: 8080 }\n\nنصيحة: اجعل /healthz يفحص العملية فقط، و /ready يفحص الجاهزية الحقيقية للـ DB والـ cache، واستخدم init container للـ migrations أثناء النشر.",
+        "difficulty": "advanced",
+        "tags": ["kubernetes", "monitoring", "reliability"]
+      },
+      {
+        "q": "كيف تراقب تطبيقاً في الإنتاج؟",
+        "a": "ثلاث ركائز:\n\n1. Logging: سجلات JSON منظمة مع trace IDs، ومُرسلة لمركز تجميع مثل ELK أو Loki بدل tail على السيرفر. تجنّب تسجيل passwords أو tokens أو بيانات شخصية.\n\n2. Metrics: أرقام قابلة للتجميع مثل RED (Rate, Errors, Duration) لكل endpoint، ومقاييس البنية (CPU، ذاكرة، event loop lag، عمق الـ queue). Prometheus مع Grafana هو المعيار.\n\n3. Tracing: تتبع طلب واحد عبر عدة خدمات عبر Jaeger أو OpenTelemetry، وهو ضروري في المعمارية الموزعة لمعرفة أين يضيع الوقت.\n\nعملياً: اربط الثلاثة بأداة أخطاء مثل Sentry، واجعل لكل alert Runbook واضح، فتنبيه بلا إجراء محدد مجرد ضجيج يستهلك ثقة الفريق. وأضف request correlation: نفس الـ correlation id يمر من الـ log إلى الـ trace فيمكنك تتبع رحلة أي طلب كامل.",
+        "difficulty": "intermediate",
+        "tags": ["monitoring", "observability", "reliability"]
+      }
+    ]
+  },
+  {
+    "id": "databases",
+    "label": "قواعد البيانات & SQL",
+    "icon": "🗄️",
+    "color": "#8E44AD",
+    "questions": [
+      {
+        "q": "كيف تختار أعمدة الـ Index في جدول حقيقي؟",
+        "a": "المنهج العملي:\n\n1. ابدأ من الـ queries الفعلية: راجع أبطأ الاستعلامات في slow query log أو APM، ولا تفهرس بالتخمين.\n\n2. افهرس أعمدة الـ WHERE و JOIN و ORDER BY الأكثر تكراراً، وفي composite index اجعل الترتيب: أعمدة المساواة أولاً ثم Range ثم Sort.\n\n3. القاعدة: composite index واحد قد يخدم عدة استعلامات، لكنه لا يخدم ترتيباً مقلوباً، فـ index(a, b) لا ينفع لـ ORDER BY b.\n\n4. الفهارس الخاصة: Unique composite يمنع التكرار على مستوى التركيبة (مثل user_id مع email)، و Partial index بشرط WHERE يقلّص الحجم بشدة.\n\n5. تجنّب: فهرسة أعمدة منخفضة الـ cardinality، وأعمدة تتغير باستمرار، وفهرسة زائدة تُبطئ INSERT بشكل ملموس.\n\n6. راقب index usage بانتظام واحذف الفهارس غير المستخدمة، فكل فهرس غير مفيد تكلفة صامتة على كل عملية كتابة.",
+        "difficulty": "intermediate",
+        "tags": ["indexing", "performance", "schema-design"]
+      },
+      {
+        "q": "ما هو EXPLAIN و كيف تقرأه لتحسين الـ queries؟",
+        "a": "EXPLAIN يعرض خطة التنفيذ التي تختارها قاعدة البيانات دون تنفيذ الـ query فعلياً، وهو أهم أداة لتحسين الأداء.\n\nفي MySQL و Postgres راقب:\n• type: ALL يعني full table scan وهي أخطر حالة، خاصة على جدول كبير\n• rows: عدد الصفوف التي يُتوقع قراءتها، وكلما قلّ كان أفضل\n• key: الـ index المستخدم فعلاً، وغيابه يعني أن الـ index غير فعّال\n• Extra: Using index تعني covering index وهو ممتاز، أما Using temporary أو Using filesort فهي علامة تحذير\n\nخطوات عملية:\n1. شغّل EXPLAIN ANALYZE لتوقيت كل مرحلة فعلياً لا للتقدير.\n2. إن رأيت seq scan على جدول كبير، أضف index على عمود الـ WHERE ثم أعد المحاولة.\n3. filesort لا يعني مشكلة دائماً لكنه مؤشر على index مفقود يطابق ترتيب ORDER BY.\n4. قارن التقدير بالواقع: فروق كبيرة تعني إحصائيات قديمة، وحلها تشغيل ANALYZE.",
+        "difficulty": "intermediate",
+        "tags": ["query-optimization", "performance", "sql"]
+      },
+      {
+        "q": "ما الفرق بين INNER JOIN و LEFT JOIN و CROSS JOIN؟",
+        "a": [
+          "INNER JOIN: يُرجع الصفوف المطابقة في الجدولين فقط، والصفوف بلا تطابق تُستبعد تماماً. وهو الافتراضي عند كتابة JOIN بلا نوع.",
+          "LEFT JOIN: يُرجع كل صفوف الجدول الأيسر ومطابقاته في الأيمن إن وُجدت، ويضع NULL حيث لا يوجد تطابق، فيُستخدم لإظهار جميع المستخدمين حتى بلا طلبات مثلاً.",
+          "CROSS JOIN: جد ضرب كامل، كل صف في الأول مع كل صف في الثاني. يُستخدم نادراً في الاستعلامات، ومرتبط باستخدامه مع COUNT لا COUNT(*).",
+          "مثال عملي مهم: SUM(CASE WHEN payment.id IS NULL THEN 1 ELSE 0 END) مع LEFT JOIN لحساب الطلبات بلا دفع، وهنا تفشل INNER JOIN لأنها تُسقط تلك الطلبات.",
+          "انتبه للفخ: RIGHT JOIN نادر الاستخدام، وربط جداول بلا شرط ON ينتج cross join غير مقصود، و NULL لا يُقارن بـ = بل بـ IS NULL."
+        ],
+        "difficulty": "beginner",
+        "tags": ["joins", "sql", "queries"]
+      },
+      {
+        "q": "ما هو N+1 في الـ SQL وكيف تكشفه؟",
+        "a": "النمط: تنفّذ query واحدة لجلب N صف، ثم تنفّذ N query إضافية لجلب بيانات مرتبطة بكل صف.\n\nمثال:\nSELECT * FROM posts;              -- query واحدة\nSELECT * FROM users WHERE id = ?; -- مرة لكل post\n\nالأداء: مع 1000 صف يعني 1001 query، والعدد ينمو خطياً مع حجم الجدول.\n\nالحلول:\n• JOIN في query واحدة\n• IN subquery: WHERE user_id IN (SELECT ...)\n• Eager loading: with('user') أو selectinload في SQLAlchemy\n• Batch: WHERE user_id IN (...) ثم ربط النتائج في الذاكرة\n\nالكشف: أي logging يطبع عدد الاستعلامات، أو query log، أو اختبار بسيط على بيانات كبيرة، أو APM في الإنتاج.\n\nفي Eloquent تحديد: استخدم $posts->load('user') أو withCount، وتجنّب whereHas مع eager loading بلا شرط فلترة لأنه يُنتج نتائج مكررة.",
+        "difficulty": "intermediate",
+        "tags": ["n-plus-one", "orm", "performance"]
+      },
+      {
+        "q": "متى تطبّق Normalization ومتى تختار Denormalization؟",
+        "a": [
+          "Normalization: تفكيك البيانات إلى جداول مستقلة لتقليل التكرار وضمان اتساقه، فيصبح التعديل من مكان واحد فقط. وهي القاعدة الافتراضية في تصميم المخطط.",
+          "لماذا نطبّعها؟ منع anomalies التحديث (تعديل اسم المنتج في عشرات الصفوف)، ومنع anomalies الإدراج والحذف، وتقليل حجم البيانات المكرر.",
+          "Denormalization: إضافة تكرار مقصود لتحسين أداء القراءة، مثل تخزين اسم المستخدم مع الطلب لتفادي JOIN في مسار حرج، أو حقول محسوبة مسبقاً.",
+          "متى تختارها؟ في أنظمة القراءة الكثيفة مثل reporting و feeds، أو عندما يُقاس فعلاً بـ EXPLAIN أن الـ JOIN هو الـ bottleneck.",
+          "التكلفة: denormalization تجلب خطر تعارض البيانات، فالتزم بقيمة TTL أو آلية تحديث واضحة، واعلم أنك تتحمل تكلفة كل كتابة مقابل توفير كل قراءة."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["normalization", "schema-design", "performance"]
+      },
+      {
+        "q": "ما هي مستويات عزل الـ Transactions (Isolation Levels)؟",
+        "a": [
+          "Read Uncommitted: يقرأ غير المُثبَت فيظهر بيانات غير نهائية، وهو مستوى نادر الاستخدام في MySQL و Postgres.",
+          "Read Committed: يقرأ المُثبَت فقط (الافتراضي في PostgreSQL و SQL Server)، فيمنع قراءة القيم غير النهائية لكنه يسمح بـ non-repeatable reads.",
+          "Repeatable Read: يضمن أن القراءة المتكررة لنفس الصف ترى نفس القيمة (الافتراضي في MySQL مع InnoDB)، ويمنع phantom reads جزئياً عبر gap locks.",
+          "Serializable: يحاكي التنفيذ التسلسلي تماماً. الأدق والأبطأ، وقد يرمي serialization failure يجب التعامل معه بإعادة المحاولة.",
+          "مشكلة Phantom: تظهر في SELECT WHERE على نطاق عندما تدخل صفوف جديدة أثناء الـ transaction، وتُعالج بالمستويات الأعلى أو بقفل صريح.",
+          "اختيار عملي: Read Committed كافٍ في أغلب التطبيقات، ولا ترتقِ إلى مستوى أعلى إلا إذا كان الـ use case يفرض ذلك فعلاً بعد قياس."
+        ],
+        "difficulty": "advanced",
+        "tags": ["transactions", "concurrency", "acid"]
+      },
+      {
+        "q": "ما الفرق بين CHAR و VARCHAR و TEXT في SQL؟",
+        "a": [
+          "CHAR(n): طول ثابت، تخزّن السلسلة بالطول المحدد مع padding، وأسرع في القراءة لكنها تضيّع المساحة إن كان الطول الفعلي أقل.",
+          "VARCHAR(n): طول متغير حتى الحد الأقصى n، وهي الخيار الافتراضي للأسماء والنصوص القصيرة، وتخزّن الطول الفعلي فقط.",
+          "TEXT: أطوال كبيرة جداً (حتى 64KB في MySQL) للسجلات والأوصاف الطويلة، وتُخزّن خارج الصف نفسه في بعض المحركات ما يجعل الفهرسة أصعب.",
+          "نقطة مهمة: في MySQL لا يمكن فهرسة عمود TEXT مباشرة، فاستخدم عموداً من نوع VARCHAR للمفاتيح التي تحتاج index، أو أضف بادئة prefix index.",
+          "قاعدة عملية: استخدم CHAR للمعرّفات ذات الطول الثابت مثل country code، و VARCHAR لأغلب الحقول النصية، و TEXT للنصوص الطويلة دون فهرسة."
+        ],
+        "difficulty": "beginner",
+        "tags": ["schema-design", "sql", "storage"]
+      },
+      {
+        "q": "ما هو Deadlock وكيف تمنعه؟",
+        "a": "الـ Deadlock يحدث عندما تحجز كل عملية resources وتنتظر موارد تحجزها الأخرى، فتتوقف الاثنتان نهائياً إلى أن يكتشفهما المحرك ويُلغي إحداهما.\n\nمثال كلاسيكي: عملية A تقفل صف المستخدم ثم تحجز الطلب، وعملية B تفعل العكس تماماً في هذا الترتيب.\n\nالوقاية:\n1. حافظ على ترتيب ثابت للقفل في كل مكان، فهذا يمنع الدورات.\n2. اجعل المعاملات قصيرة، فالمعاملات الطويلة تحجز القفل وقتاً أطول.\n3. استخدم فهرسة مناسبة تمنع الـ deadlocks الناتجة عن مسح صفحات كثيرة.\n4. فكّر في optimistic locking بدل pessimistic locking حيث الأمان مطلوب.\n5. استخدم select for update على أصغر عدد ممكن من الصفوف.\n\nالتعامل: أعد المحاولة تلقائياً بعد فترة backoff عشوائية، فبعض الـ deadlocks عابرة، وراقب الـ deadlock graph في الـ DB لتعديل ترتيب القفل.",
+        "difficulty": "advanced",
+        "tags": ["transactions", "concurrency", "locking"]
+      },
+      {
+        "q": "ما الفرق بين InnoDB و MyISAM؟",
+        "a": [
+          "InnoDB: محرك المعاملات في MySQL و MariaDB، يدعم ACID كاملاً و foreign keys و MVCC و row-level locking، وهو الخيار الصحيح لأي تطبيق حقيقي اليوم.",
+          "MyISAM: محرك قديم بلا دعم للمعاملات وبلا foreign keys، ويعتمد على table-level locking فيتحمّل عبء الكتابة جيداً لكنه ينهار مع قراء متزامنة كثيرة.",
+          "في الفروق العملية: MyISAM ينهار تلقائياً عند عدم السلامة أثناء الكتابة، يمكن الاسترجاع بـ REPAIR TABLE، بينما InnoDB يسجل العملية ويضمنها.",
+          "ملاحظة أداء: row-level locking في InnoDB أفضل للحمل المختلط، لكن table-level locking في MyISAM كان أسرع في الكتابة المتزامنة البحتة في نسخ قديمة.",
+          "الحكم: استخدم InnoDB دائماً إلا في حالات قديمة جداً أو ملفات قراءة فقط، فالفرق لم يعد يبرر أي حالة استخدام لـ MyISAM."
+        ],
+        "difficulty": "intermediate",
+        "tags": ["storage-engines", "sql", "transactions"]
+      },
+      {
+        "q": "كيف تحسّن أداء قاعدة البيانات على مستوى الـ Schema؟",
+        "a": "1. فهرسة مدروسة: على أعمدة WHERE و JOIN و ORDER BY، مع composite indexes بالترتيب الصحيح.\n\n2. الأنواع الصحيحة: لا تستخدم VARCHAR(255) لكل شيء، فأنواع محددة توفّر مساحة وتسرّع المقارنات. وضع NOT NULL متى أمكن لأنه يسرّع الفهرسة.\n\n3. فك التطبيع بحذر: denormalize الحقول المتكررة القراءة أو أضف materialized views للـ reports.\n\n4. partitioning: قسّم الجداول الكبيرة زمنياً أو على مفتاح شائع، فيسهل حذف البيانات القديمة مع عملية خفيفة.\n\n5. الترقيم: استخدم keyset pagination بدل OFFSET، فالأخير يتناقص أداءه كلما زاد رقم الصفحة.\n\n6. hygiene للأعمدة: احذف الأعمدة غير المستخدمة، وتجنّب EAV tables، واستخدم JSON فقط حين لا تفرض العلاقات schema صارماً.\n\n7. راقب: slow query log و query performance، وأعد التحليل بعد كل تغيير حجم حقيقي.",
+        "difficulty": "advanced",
+        "tags": ["schema-design", "performance", "indexing"]
+      },
+      {
+        "q": "ما هو Connection Pooling ولماذا هو مهم؟",
+        "a": "Connection Pool هو مجموعة اتصالات جاهزة محفوظة في الذاكرة ومُعاد استخدامها، بدل فتح اتصال جديد مع الـ database في كل request ثم إغلاقه.\n\nلماذا هو مهم؟ فتح اتصال TCP والمصادقة عليه مكلف، وقد يستهلك عشرات الـ ms، بينما الاتصال المحفوظ جاهز للاستخدام فوراً. وعلى الأنظمة عالية التحميل تستنزف الاتصالات المفتوحة.\n\nأمثلة: HikariCP و c3p0 في Java، و pgBouncer لـ PostgreSQL، و pymysql مع QPCache في Python.\n\nالقواعد:\n• اجعل حجم الـ pool محدوداً، فالأعداد الكبيرة من الاتصالات تستنزف موارد قاعدة البيانات نفسها.\n• اجعل pool أصغر من max_connections في قاعدة البيانات، وراقب الـ wait time على الـ pool فهو مؤشر مبكر على الاختناق.\n• في البيئات serverless بلا state دائم، استخدم external pooler لأن كل طلب ينشئ بيئة جديدة.",
+        "difficulty": "intermediate",
+        "tags": ["performance", "architecture", "scaling"]
       }
     ]
   }

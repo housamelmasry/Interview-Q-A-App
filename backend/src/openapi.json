@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Arabic Interview Guide API",
-    "version": "1.0.0",
-    "description": "REST API backing the Arabic Interview Guide, a full-stack technical interview preparation app. Questions are grouped into categories and each question owns one or more answers.\n\nAll data is served from a local SQLite database. **This API has no authentication** - it is intended for local development and demonstration.",
+    "version": "2.0.0",
+    "description": "REST API backing the Arabic Interview Guide, a full-stack technical interview preparation app. Questions are grouped into categories and each question owns one or more answers. Features include full-text search, pagination, and difficulty/tags metadata.\n\nAll data is served from a local SQLite database. **This API has no authentication** - it is intended for local development and demonstration.",
     "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" }
   },
   "servers": [
@@ -13,6 +13,7 @@
     { "name": "System", "description": "Health and discovery" },
     { "name": "Categories", "description": "Guide sections and their display metadata" },
     { "name": "Questions", "description": "Interview questions and their nested answers" },
+    { "name": "Search", "description": "Full-text search across question and answer text" },
     { "name": "Answers", "description": "Answers belonging to a single question" }
   ],
   "paths": {
@@ -34,6 +35,41 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Aggregate counts and per-category counts",
+        "description": "Returns the total number of categories, questions and answers, plus every category with its `question_count`. Categories are ordered alphabetically by label, matching `GET /api/categories`. Drives the header summary and the per-category tab badges.",
+        "responses": {
+          "200": {
+            "description": "Totals and per-category counts",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StatsResponse" },
+                "example": {
+                  "total_categories": 8,
+                  "total_questions": 61,
+                  "total_answers": 140,
+                  "categories": [
+                    {
+                      "id": "laravel-core",
+                      "label": "Laravel Core",
+                      "icon": "🔴",
+                      "color": "#FF4444",
+                      "question_count": 12
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "tags": ["Categories"],
@@ -47,6 +83,10 @@
                 "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } }
               }
             }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       },
@@ -128,6 +168,10 @@
                 "example": { "error": "Category not found" }
               }
             }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       },
@@ -148,6 +192,10 @@
           "404": {
             "description": "No category with that id",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       }
@@ -156,7 +204,7 @@
       "get": {
         "tags": ["Questions"],
         "summary": "List questions with their answers",
-        "description": "Returns a single flat join of questions, categories and answers, grouped server-side so each question carries a nested `answers` array. Answers are ordered oldest first.",
+        "description": "Returns a paginated envelope of questions, each carrying its category metadata, difficulty, tags and a nested `answers` array. Answers are ordered oldest first.\n\n`page` is 1-based and `limit` defaults to 20 and is clamped to a maximum of 100; invalid values fall back to the defaults instead of erroring. Pagination counts questions, not joined rows, so a question with three answers still occupies one slot on the page.",
         "parameters": [
           {
             "name": "category",
@@ -165,29 +213,57 @@
             "description": "Restrict results to one category id.",
             "schema": { "type": "string" },
             "example": "laravel-core"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "1-based page number. Defaults to 1; values below 1 or non-numeric values fall back to 1.",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 },
+            "example": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size. Defaults to 20 and is clamped to the range 1-100.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+            "example": 20
           }
         ],
         "responses": {
           "200": {
-            "description": "Questions, each with its category metadata and answers",
+            "description": "A page of questions, each with its category metadata and answers",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/QuestionWithAnswers" } },
-                "example": [
-                  {
-                    "id": 1,
-                    "question_text": "What is the service container and how does dependency injection work?",
-                    "category_id": "laravel-core",
-                    "category_label": "Laravel Core",
-                    "icon": "🔴",
-                    "color": "#FF4444",
-                    "answers": [
-                      { "id": 1, "answer_text": "The container binds class names to concrete instances." }
-                    ]
-                  }
-                ]
+                "schema": { "$ref": "#/components/schemas/PaginatedQuestions" },
+                "example": {
+                  "items": [
+                    {
+                      "id": 1,
+                      "question_text": "What is the service container and how does dependency injection work?",
+                      "category_id": "laravel-core",
+                      "category_label": "Laravel Core",
+                      "icon": "🔴",
+                      "color": "#FF4444",
+                      "difficulty": "intermediate",
+                      "tags": ["architecture"],
+                      "answers": [
+                        { "id": 1, "answer_text": "The container binds class names to concrete instances." }
+                      ]
+                    }
+                  ],
+                  "total": 61,
+                  "page": 1,
+                  "limit": 20,
+                  "pages": 4
+                }
               }
             }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       },
@@ -234,6 +310,74 @@
         }
       }
     },
+    "/api/search": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "Full-text search across questions and answers",
+        "description": "Returns the same paginated envelope as `GET /api/questions`, ordered so that questions whose own text matched rank above questions that matched only through an answer.\n\nSearch runs against SQLite FTS5 over both question text and answer text. Input is sanitised before matching - punctuation is stripped, tokens are quoted so FTS operators are inert, at most 8 tokens are used, and the final token is prefix-matched so results narrow as you type. Multi-word queries are ANDed and fall back to OR when AND yields nothing, which is needed for Arabic definite articles.\n\nA missing, empty or whitespace-only `q` is not an error: the response is 200 with an empty `items` array and `total` 0. Results are not filtered by category.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search term. An empty or whitespace-only value returns an empty result set with a 200 response rather than an error.",
+            "schema": { "type": "string" },
+            "example": "dependency injection"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "1-based page number. Defaults to 1; values below 1 or non-numeric values fall back to 1.",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 },
+            "example": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size. Defaults to 20 and is clamped to the range 1-100.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+            "example": 20
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of matching questions, ranked by relevance",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedQuestions" },
+                "example": {
+                  "items": [
+                    {
+                      "id": 1,
+                      "question_text": "What is the service container and how does dependency injection work?",
+                      "category_id": "laravel-core",
+                      "category_label": "Laravel Core",
+                      "icon": "🔴",
+                      "color": "#FF4444",
+                      "difficulty": "intermediate",
+                      "tags": ["architecture"],
+                      "answers": [
+                        { "id": 1, "answer_text": "The container binds class names to concrete instances." }
+                      ]
+                    }
+                  ],
+                  "total": 3,
+                  "page": 1,
+                  "limit": 20,
+                  "pages": 1
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      }
+    },
     "/api/questions/{id}": {
       "parameters": [
         { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
@@ -265,8 +409,21 @@
               }
             }
           },
+          "400": {
+            "description": "`category_id` or `question_text` missing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Category ID and question text are required" }
+              }
+            }
+          },
           "404": {
             "description": "No question with that id",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "500": {
+            "description": "Database error, e.g. an unknown `category_id`",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
@@ -288,6 +445,10 @@
           "404": {
             "description": "No question with that id",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       }
@@ -308,6 +469,10 @@
                 "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Answer" } }
               }
             }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       }
@@ -339,6 +504,15 @@
               }
             }
           },
+          "400": {
+            "description": "`answer_text` missing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Answer text is required" }
+              }
+            }
+          },
           "404": {
             "description": "No answer with that id",
             "content": {
@@ -347,6 +521,10 @@
                 "example": { "error": "Answer not found" }
               }
             }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       },
@@ -366,6 +544,10 @@
           "404": {
             "description": "No answer with that id",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "500": {
+            "description": "Database error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
         }
       }
@@ -379,7 +561,8 @@
           "id": { "type": "string", "description": "Caller-supplied slug used as the primary key.", "example": "laravel-core" },
           "label": { "type": "string", "description": "Display name shown on the tab.", "example": "Laravel Core" },
           "icon": { "type": "string", "description": "Emoji rendered beside the label.", "example": "🔴" },
-          "color": { "type": "string", "description": "Hex colour used for the active tab, counters and answer borders.", "example": "#FF4444" }
+          "color": { "type": "string", "description": "Hex colour used for the active tab, counters and answer borders.", "example": "#FF4444" },
+          "question_count": { "type": "integer", "description": "Number of questions in this category. Counted by a LEFT JOIN, so categories with no questions report 0.", "example": 12 }
         }
       },
       "CategoryInput": {
@@ -392,7 +575,7 @@
           "color": { "type": "string", "example": "#00B8D9" }
         }
       },
-      "QuestionWithAnswers": {
+      "Question": {
         "type": "object",
         "properties": {
           "id": { "type": "integer", "example": 1 },
@@ -401,7 +584,56 @@
           "category_label": { "type": "string", "description": "Denormalised from the join so the UI can label search results without a second request.", "example": "Laravel Core" },
           "icon": { "type": "string", "example": "🔴" },
           "color": { "type": "string", "example": "#FF4444" },
-          "answers": { "type": "array", "items": { "$ref": "#/components/schemas/Answer" } }
+          "difficulty": {
+            "type": "string",
+            "description": "Difficulty rating. Defaults to `intermediate` when the field is omitted on create or update.",
+            "enum": ["beginner", "intermediate", "advanced"],
+            "example": "intermediate"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Free-form string tags. Stored as a JSON string and always returned as an array; malformed or absent values come back as `[]`.",
+            "items": { "type": "string" },
+            "example": ["architecture", "ioc"]
+          }
+        }
+      },
+      "QuestionWithAnswers": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Question" },
+          {
+            "type": "object",
+            "properties": {
+              "answers": { "type": "array", "items": { "$ref": "#/components/schemas/Answer" } }
+            }
+          }
+        ]
+      },
+      "PaginatedQuestions": {
+        "type": "object",
+        "description": "Envelope shared by `GET /api/questions` and `GET /api/search`. `pages` is always at least 1, even when `total` is 0.",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/QuestionWithAnswers" }
+          },
+          "total": { "type": "integer", "description": "Total number of matching questions, ignoring pagination.", "example": 61 },
+          "page": { "type": "integer", "description": "1-based page number that was served.", "example": 1 },
+          "limit": { "type": "integer", "description": "Page size that was served, after clamping to 1-100.", "example": 20 },
+          "pages": { "type": "integer", "description": "Number of pages available for `total` at this `limit`.", "example": 4 }
+        }
+      },
+      "StatsResponse": {
+        "type": "object",
+        "properties": {
+          "total_categories": { "type": "integer", "example": 8 },
+          "total_questions": { "type": "integer", "example": 61 },
+          "total_answers": { "type": "integer", "example": 140 },
+          "categories": {
+            "type": "array",
+            "description": "Every category with its `question_count`, ordered by label.",
+            "items": { "$ref": "#/components/schemas/Category" }
+          }
         }
       },
       "QuestionInput": {
@@ -411,22 +643,56 @@
           "category_id": { "type": "string", "example": "laravel-core" },
           "question_text": { "type": "string", "example": "Explain the service container." },
           "answers": {
+            "description": "Optional. Accepts either an array of plain strings or an array of objects with an `answer_text` field.",
+            "oneOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "array", "items": { "$ref": "#/components/schemas/AnswerInput" } }
+            ]
+          },
+          "difficulty": {
+            "type": "string",
+            "description": "Defaults to `intermediate` when omitted.",
+            "enum": ["beginner", "intermediate", "advanced"],
+            "example": "intermediate"
+          },
+          "tags": {
             "type": "array",
-            "description": "Optional. Each item may be a plain string or an object with `answer_text`.",
-            "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/components/schemas/Answer" }] }
+            "description": "Array of strings, stored as a JSON string. Non-array values are stored as `[]`.",
+            "items": { "type": "string" },
+            "example": ["architecture"]
           }
         }
       },
       "QuestionUpdateInput": {
         "type": "object",
+        "required": ["category_id", "question_text"],
         "properties": {
           "question_text": { "type": "string" },
           "category_id": { "type": "string" },
           "answers": {
+            "description": "When present, replaces all existing answers for the question. Omit it to leave the existing answers untouched.",
+            "oneOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "array", "items": { "$ref": "#/components/schemas/AnswerInput" } }
+            ]
+          },
+          "difficulty": {
+            "type": "string",
+            "description": "Defaults to `intermediate` when omitted, so omitting it on an update overwrites a stored value.",
+            "enum": ["beginner", "intermediate", "advanced"]
+          },
+          "tags": {
             "type": "array",
-            "description": "When present, replaces all existing answers for the question.",
-            "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/components/schemas/Answer" }] }
+            "description": "Array of strings, stored as a JSON string. Non-array values are stored as `[]`.",
+            "items": { "type": "string" }
           }
+        }
+      },
+      "AnswerInput": {
+        "type": "object",
+        "required": ["answer_text"],
+        "properties": {
+          "answer_text": { "type": "string", "example": "The container binds class names to concrete instances." }
         }
       },
       "Answer": {

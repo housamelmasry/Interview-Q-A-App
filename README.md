@@ -16,7 +16,7 @@ This is a small but complete product rather than a code snippet. The database wo
 - **Real pagination.** `GET /api/questions` and `GET /api/search` return `{ items, total, page, limit, pages }`. Pagination is applied to question ids before the answers are joined in, because limiting the joined rows would let a question's answer count eat the page budget and `total` would disagree with what the client actually received.
 - **Transactional writes.** Question create and question update each run in a transaction, so a partial answer set can never persist.
 - **CI that gates on all of it.** `.github/workflows/ci.yml` runs the backend suite on Node 20 and 22, then frontend lint, type-check, tests and build, with `npm audit --audit-level=high` failing the build on a new high-severity advisory.
-- **A decomposed frontend.** `App.tsx` went from 781 lines to 334, with a typed API client, five custom hooks and 14 components behind it. Search is server-side and debounced, and in-flight requests are cancelled with `AbortController` so fast typing cannot show stale results.
+- **A decomposed frontend.** `App.tsx` went from 781 lines to 359, with a typed API client, five custom hooks and 15 components behind it. Search is server-side and debounced, and in-flight requests are cancelled with `AbortController` so fast typing cannot show stale results.
 
 It was built as a personal study tool and is documented to the standard expected of a production codebase, which makes it a practical reference for interview preparation on both frontend and backend work.
 
@@ -68,8 +68,8 @@ Full detail: [FEATURES.md](FEATURES.md). Design and data-model detail: [ARCHITEC
 Requires Docker with the Compose plugin.
 
 ```bash
-git clone https://github.com/housamelmasry/Interview.git
-cd Interview
+git clone https://github.com/housamelmasry/arabic-interview-guide.git
+cd arabic-interview-guide
 docker compose up --build
 ```
 

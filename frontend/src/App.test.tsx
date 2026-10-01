@@ -235,6 +235,29 @@ describe("question metadata", () => {
       "متوسط",
     );
   });
+
+  // Regression: the tag pill used to spread badgeStyle (which sets the `border`
+  // shorthand) and then override only `borderStyle`, which React warns about.
+  // It also read `theme.mutedText` and appended the alpha digits directly, so
+  // the dark-mode `#666` produced `#66644` and the whole border declaration was
+  // discarded. Asserting the serialised attribute covers both problems at once.
+  it("gives tag pills a single valid dashed border", async () => {
+    mockApi();
+    renderApp();
+
+    const card = (await screen.findAllByTestId("question-card"))[0];
+    const style = within(card)
+      .getAllByTestId("question-tag")[0]
+      .getAttribute("style");
+
+    const borders = (style ?? "").match(/border:[^;]*/g) ?? [];
+    expect(borders).toHaveLength(1);
+    // jsdom normalises an 8-digit hex colour to `rgba()`, so accept either form.
+    expect(borders[0]).toMatch(
+      /^border: 1px dashed (#[0-9a-f]{8}|rgba\(\d+, \d+, \d+, 0\.\d+\))$/i,
+    );
+    expect(style).not.toMatch(/border-style/);
+  });
 });
 
 describe("search", () => {

@@ -161,7 +161,9 @@ Base URL `http://localhost:3000`. All request and response bodies are JSON. 15 r
 
 `category_label`, `icon` and `color` are denormalised into the payload deliberately: without them the client would need a second request to label search results. `tags` is stored as a JSON string and parsed on the way out, falling back to `[]` for a row that cannot be parsed, so one bad value cannot break the whole list.
 
-`POST` and `PUT /api/questions` accept answers either as plain strings or as objects with an `answer_text` field, which keeps the payload convenient for both the UI and `curl`. `difficulty` defaults to `intermediate` and `tags` to `[]` when omitted. `POST /api/categories` defaults `icon` to `""` and `color` to `#666666`.
+`POST` and `PUT /api/questions` accept answers either as plain strings or as objects with an `answer_text` field, which keeps the payload convenient for both the UI and `curl`. Blank and non-text entries are dropped rather than stored as meaningless answers. `POST /api/categories` defaults `icon` to `""` and `color` to `#666666`.
+
+On `POST`, `difficulty` defaults to `intermediate` and `tags` to `[]` when omitted. On `PUT` those two are treated as partial updates instead: an omitted key keeps whatever is stored, so editing only the text of a question cannot silently reset its difficulty or wipe its tags. Sending an explicit `[]` for `tags`, or `[]` for `answers`, clears them. An unrecognised `difficulty` is stored as `intermediate` rather than verbatim, so the UI always has a label and colour for the badge it renders.
 
 ### Pagination parameters
 

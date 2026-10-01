@@ -36,3 +36,30 @@ export const createTheme = (isDarkMode: boolean): Theme => ({
 });
 
 export const FONT_STACK = "'Tajawal', 'Cairo', sans-serif";
+
+/**
+ * Appends an alpha suffix to a hex colour.
+ *
+ * Theme and category colours are written as 3-digit shorthands (`#666`) about as
+ * often as 6-digit values, so concatenating `44` straight onto the string is not
+ * safe: `#666` + `44` yields `#66644`, five hex digits, which is an invalid
+ * colour that browsers and jsdom silently drop. Expand the shorthand first so
+ * the result is always a valid 8-digit `#rrggbbaa`.
+ *
+ * Anything that is not a 3- or 6-digit hex is passed through untouched, which
+ * leaves `transparent`, `rgb(...)` and named colours alone.
+ */
+export const withAlpha = (color: string, alpha: string): string => {
+  const hex = color.trim();
+
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    const [r, g, b] = hex.slice(1).toLowerCase();
+    return `#${r}${r}${g}${g}${b}${b}${alpha}`;
+  }
+
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    return `${hex}${alpha}`;
+  }
+
+  return color;
+};

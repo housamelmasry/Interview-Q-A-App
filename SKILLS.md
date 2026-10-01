@@ -11,7 +11,7 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/db/migrations/002-question-metadata.js`, `backend/src/db/migrations/001-initial-schema.js`, `backend/src/seed-data.js:21-44`
 
 **Referential integrity** — `PRAGMA foreign_keys = ON` on every connection (SQLite defaults this off, which silently disables cascades) plus `ON DELETE CASCADE` on both foreign keys, so dependent rows cannot be orphaned. Asserted by tests rather than assumed: deleting a category removes its questions and their answers.
-`backend/src/database.js:25-29`, `backend/src/db/migrations/001-initial-schema.js`, `backend/test/api.test.js:670-692`
+`backend/src/database.js:25-30`, `backend/src/db/migrations/001-initial-schema.js`, `backend/test/api.test.js:886-906`
 
 ## Versioned migrations
 
@@ -28,7 +28,7 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/db/migrate.js:13-31`, `backend/src/data.json`
 
 **Startup ordering** — the port is bound only after migrations have run and starter categories are in place, so no request can arrive before the schema is usable; a migration failure exits rather than serving a broken API.
-`backend/src/database.js:31-40`, `backend/src/server.js:455-463`
+`backend/src/database.js:31-40`, `backend/src/server.js:317-323`
 
 ## Query performance
 
@@ -42,10 +42,10 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/test/api.test.js:76-127`
 
 **Paginating by entity, not by joined row** — the result query fans each question out to one row per answer, so `LIMIT` applied to it would let a question's answer count consume the page budget (a page of 20 could return 7 questions). Both list endpoints page the question ids first and hydrate exactly those ids in a second statement; the placeholder list is built from the actual id count rather than padded to a fixed width.
-`backend/src/server.js:210-233`, `backend/src/search.js:70-93`, `backend/src/search.js:164-172`
+`backend/src/server.js:187-196`, `backend/src/search.js:70-77`, `backend/src/search.js:170-176`
 
 **Aggregation for counts instead of extra requests** — `GET /api/stats` returns the site-wide totals and the per-category breakdown in one response for the header summary, and `GET /api/categories` carries `question_count` per row for the tab badges, so neither needs a second request.
-`backend/src/server.js:90-108`, `backend/src/server.js:114-127`
+`backend/src/server.js:77-79`, `backend/src/repository.js:70-76`
 
 ## Full-text search
 
@@ -62,13 +62,13 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/db/migrations/004-full-text-search.js:16-22`, `backend/test/api.test.js:477-482`
 
 **Search-input sanitization treated as a security property** — FTS5 treats `"`, `*`, `^`, `NEAR`, `OR` and parentheses as syntax, so raw user input to `MATCH` yields `500`s and lets a term smuggle in operators. `buildMatchQuery` strips everything that is not a letter or digit, caps at 8 tokens, wraps each in double quotes so it becomes an inert string literal, and appends `*` to the last token only for prefix search. A table of FTS5 operators (`"`, `NEAR`, `*`, `container^`, `a OR`, `(((`) is run through the endpoint in tests, plus an assertion that an injection attempt does not return the whole corpus.
-`backend/src/search.js:12-36`, `backend/test/api.test.js:579-600`
+`backend/src/search.js:12-36`, `backend/test/api.test.js:645-666`
 
 **A domain-specific fallback, not a generic one** — multi-word queries are ANDed, but Arabic writes the definite article attached to the word, so "ال container" contains a token that matches nothing in the corpus and the AND attempt returns zero. An empty AND result is retried with `OR`. The fallback only fires on an empty result set, so the extra round trip is paid only in the rare case.
-`backend/src/search.js:139-159`, `backend/test/api.test.js:548-565`
+`backend/src/search.js:148-168`, `backend/test/api.test.js:613-634`
 
 **Prefix search for an as-you-type box** — only the final token gets the `*` suffix, so results narrow as the user types instead of every token becoming a prefix match.
-`backend/src/search.js:33-35`
+`backend/src/search.js:33-36`
 
 ## API design
 
@@ -76,39 +76,42 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/server.js`
 
 **A pagination envelope so the client needs no second request** — `GET /api/questions` and `GET /api/search` both answer with `{ items, total, page, limit, pages }`, where `total` counts the whole match set. `page` is 1-based, `limit` defaults to 20 and is clamped to 1..100, and invalid input falls back to a default rather than erroring, so a stale hand-edited link still renders.
-`backend/src/server.js:51-79`, `backend/src/server.js:193-239`, `backend/src/server.js:242-259`
+`backend/src/server.js:45-66`, `backend/src/server.js:187-214`, `backend/src/server.js:231-246`
 
 **Correct status semantics** — creates return `201` with the new id; required fields are checked before any write and return `400`; updates and deletes inspect `this.changes` and return `404` rather than reporting success on a no-op.
-`backend/src/server.js:129-147`, `backend/src/server.js:261-315`, `backend/src/server.js:397-452`
+`backend/src/server.js:138-185`, `backend/src/server.js:248-255`, `backend/src/repository.js:189-217`
 
 **Falsy parameter parsing handled explicitly** — `Number.parseInt` returns `NaN` rather than `undefined` for junk input, so the code tests `Number.isFinite` before clamping. `?limit=abc&page=xyz` yields the defaults; `?limit=0&page=0` yields `limit=1, page=1`.
-`backend/src/server.js:59-69`, `backend/test/api.test.js:384-395`
+`backend/src/server.js:58-66`, `backend/test/api.test.js:571-600`
 
 **Denormalised read payloads** — category `label`, `icon` and `color` are selected alongside each question so a search result can be labelled without a second lookup.
 `backend/src/search.js:84-93`
 
-**OpenAPI 3.0 specification as a committed artifact** — a 727-line document with 9 paths and 14 reusable schemas, served both as raw JSON and through an interactive Swagger UI. Because it is a file rather than route annotations, the contract is reviewable in a pull request and diffable over time. Cascade behaviour, the replace-not-patch contract of `PUT /api/questions/:id`, and the fact that `answers` accepts both strings and objects are written down rather than left to be inferred.
-`backend/src/openapi.json`, `backend/src/server.js:19-27`
+**OpenAPI 3.0 specification as a committed artifact** — a ~1,250-line document with 9 paths and 14 reusable schemas, served both as raw JSON and through an interactive Swagger UI. Because it is a file rather than route annotations, the contract is reviewable in a pull request and diffable over time. Cascade behaviour, the partial-update contract of `PUT /api/questions/:id` (an omitted key keeps its stored value; an explicit `[]` clears), and the fact that `answers` accepts both strings and objects are written down rather than left to be inferred.
+`backend/src/openapi.json`, `backend/src/server.js:26-30`
 
 **Testability by construction** — the app is exported and the port is bound only when `server.js` is run directly, so the suite drives the real application in-process with no listener. `DB_PATH` redirects the database, isolating tests from local data.
-`backend/src/server.js:452-465`, `backend/src/database.js:13-15`, `backend/test/api.test.js:10-16`
+`backend/src/server.js:310-323`, `backend/src/database.js:13-15`, `backend/test/api.test.js:10-16`
 
 ## Transactions and write integrity
 
 **ACID transactions around multi-row writes** — question creation and question-with-answers updates run inside `BEGIN` … `COMMIT` with `ROLLBACK` on every failure path, including a no-op update that has to roll back before its own `404`. A question can therefore never persist with a partial answer set.
-`backend/src/server.js:274-315`, `backend/src/server.js:337-379`
+`backend/src/repository.js:34-51`, `backend/src/repository.js:157-217`
 
 **A transaction boundary proven by a test** — a create whose `category_id` does not exist fails on the foreign key, and the test asserts the question count is unchanged afterwards. That is the assertion that actually pins the rollback rather than describing it.
 `backend/test/api.test.js:292-300`
 
 **Replace-not-patch semantics for a child collection** — a supplied `answers` array is the complete desired set, deleted and reinserted inside one transaction; omitting the array leaves answers untouched. Simpler and safer than diffing, and the reason the individual answer endpoints are unused by the UI.
-`backend/src/server.js:317-364`, `backend/test/api.test.js:397-446`
+
+**Consistent partial-update semantics across every optional field** — omitting `tags` or `difficulty` keeps the stored value, because `updateQuestion` builds its `SET` clause from the keys actually present rather than defaulting them. Applying this only to `answers` was a genuine bug: a text-only edit reset the difficulty to `intermediate` and blanked the tags. The regression test asserts both directions, that omitting keeps and an explicit `[]` clears.
+`backend/src/repository.js:189-217`, `backend/src/server.js:164-185`, `backend/test/api.test.js:388-429`
+`backend/src/repository.js:189-217`, `backend/test/api.test.js:344-379`
 
 **SQL injection defence** — every query in the project uses `?` placeholders. No user input is concatenated into SQL anywhere, including the id lists in the two hydrate queries, which are generated from placeholder marks.
 `backend/src/server.js`, `backend/src/search.js`, `backend/src/db/migrations/`
 
 **Non-destructive bootstrap versus explicit seed** — startup inserts any category from `data.json` that is missing and leaves existing rows alone; `npm run seed` is the deliberate destructive reset. A normal restart can never wipe a user's edits.
-`backend/src/database.js:65-96`, `backend/src/seed-data.js:46-96`
+`backend/src/database.js:65-98`, `backend/src/seed-data.js:46-96`
 
 ## Frontend
 
@@ -153,7 +156,7 @@ A map of the engineering skills this project exercises, with the file and line w
 
 ## Testing
 
-**API integration tests** — 52 tests across 8 suites using the built-in `node:test` runner and Supertest. They exercise the real app, real SQL, real migrations, real transactions and real cascades against a temporary database, not mocks.
+**API integration tests** — 59 tests across 8 suites using the built-in `node:test` runner and Supertest. They exercise the real app, real SQL, real migrations, real transactions and real cascades against a temporary database, not mocks.
 `backend/test/api.test.js`
 
 **Asserting on query plans, not just results** — a test can pass while the data layer silently degrades to a full scan. The suite checks `sqlite_master` for the three index names and then checks `EXPLAIN QUERY PLAN` output for both foreign-key predicates, so a dropped index or a planner regression fails the build.

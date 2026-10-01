@@ -258,19 +258,206 @@ describe("questions", () => {
         category_id: "laravel-core",
         question_text: "Hard question",
         answers: ["Answer"],
-        difficulty: "hard",
-        tags: ["advanced", "php"],
+        difficulty: "advanced",
+        tags: ["performance", "php"],
       })
       .expect(201);
 
     const rows = await all("SELECT * FROM questions WHERE id = ?", [res.body.id]);
-    assert.equal(rows[0].difficulty, "hard");
-    assert.deepEqual(JSON.parse(rows[0].tags), ["advanced", "php"]);
+    assert.equal(rows[0].difficulty, "advanced");
+    assert.deepEqual(JSON.parse(rows[0].tags), ["performance", "php"]);
 
     const listed = await api.get("/api/questions?category=laravel-core&limit=100").expect(200);
     const item = listed.body.items.find((q) => q.id === res.body.id);
-    assert.equal(item.difficulty, "hard");
-    assert.deepEqual(item.tags, ["advanced", "php"], "tags are exposed as a JSON array");
+    assert.equal(item.difficulty, "advanced");
+    assert.deepEqual(item.tags, ["performance", "php"], "tags are exposed as a JSON array");
+  });
+
+  // The OpenAPI schema declares difficulty as an enum, so an unknown level is a
+  // client bug. Storing it would reach the UI's label/colour maps and render an
+  // unstyled badge, so it falls back instead.
+  test("falls back to intermediate for an unknown difficulty", async () => {
+    for (const bad of ["hard", "BEGINNER", "<script>alert(1)</script>"]) {
+      const res = await api
+        .post("/api/questions")
+        .send({
+          category_id: "laravel-core",
+          question_text: `Difficulty probe ${bad}`,
+          difficulty: bad,
+        })
+        .expect(201);
+
+      const rows = await all("SELECT difficulty FROM questions WHERE id = ?", [
+        res.body.id,
+      ]);
+      assert.equal(
+        rows[0].difficulty,
+        "intermediate",
+        `${bad} must not be stored verbatim`,
+      );
+      await api.delete(`/api/questions/${res.body.id}`).expect(200);
+    }
+  });
+
+  test("normalises tags: trims, lowercases, dedupes, drops blanks, caps length", async () => {
+    const res = await api
+      .post("/api/questions")
+      .send({
+        category_id: "laravel-core",
+        question_text: "Tag normalisation probe",
+        tags: ["  Caching  ", "caching", "", "   ", "Event Loop", "x".repeat(200)],
+      })
+      .expect(201);
+
+    const rows = await all("SELECT tags FROM questions WHERE id = ?", [res.body.id]);
+    const tags = JSON.parse(rows[0].tags);
+
+    assert.deepEqual(
+      tags,
+      ["caching", "event-loop", "x".repeat(40)],
+      "blank tags dropped, duplicates collapsed, spaces to dashes, over-long truncated",
+    );
+    assert.ok(tags.every((t) => typeof t === "string" && t.length > 0));
+
+    await api.delete(`/api/questions/${res.body.id}`).expect(200);
+  });
+
+  test("caps the number of stored tags", async () => {
+    const res = await api
+      .post("/api/questions")
+      .send({
+        category_id: "laravel-core",
+        question_text: "Tag count probe",
+        tags: Array.from({ length: 20 }, (_, i) => `tag-${i}`),
+      })
+      .expect(201);
+
+    const rows = await all("SELECT tags FROM questions WHERE id = ?", [res.body.id]);
+    assert.equal(JSON.parse(rows[0].tags).length, 6);
+
+    await api.delete(`/api/questions/${res.body.id}`).expect(200);
+  });
+
+  // The repository distinguishes an absent `answers` key from an empty one:
+  // absent means "keep what is there", empty means "remove them all". Getting
+  // that wrong silently deletes a question's answers on a text-only edit.
+  test("an omitted answers key preserves answers, an empty array clears them", async () => {
+    const created = await api
+      .post("/api/questions")
+      .send({
+        category_id: "nodejs",
+        question_text: "Answer-preservation probe",
+        answers: ["first", "second"],
+      })
+      .expect(201);
+
+    await api
+      .put(`/api/questions/${created.body.id}`)
+      .send({ question_text: "Edited, answers untouched", category_id: "nodejs" })
+      .expect(200);
+
+    let answers = await all("SELECT * FROM answers WHERE question_id = ?", [
+      created.body.id,
+    ]);
+    assert.equal(
+      answers.length,
+      2,
+      "omitting answers must not delete the existing ones",
+    );
+
+    await api
+      .put(`/api/questions/${created.body.id}`)
+      .send({
+        question_text: "Edited, answers cleared",
+        category_id: "nodejs",
+        answers: [],
+      })
+      .expect(200);
+
+    answers = await all("SELECT * FROM answers WHERE question_id = ?", [
+      created.body.id,
+    ]);
+    assert.equal(answers.length, 0, "an explicit empty array must clear them");
+  });
+
+  // `answers` used to be the only field with presence semantics. Now that a
+  // caller can patch one field, `tags` and `difficulty` must behave the same
+  // way, or a text-only edit silently blanks the metadata. Before this fix the
+  // update route defaulted difficulty to `intermediate` and tags to `[]`
+  // regardless of what the body contained.
+  test("an omitted tags or difficulty key preserves the stored value", async () => {
+    const created = await api
+      .post("/api/questions")
+      .send({
+        category_id: "nodejs",
+        question_text: "Partial update probe",
+        difficulty: "advanced",
+        tags: ["caching", "streams"],
+        answers: ["first"],
+      })
+      .expect(201);
+
+    await api
+      .put(`/api/questions/${created.body.id}`)
+      .send({ question_text: "Edited text only", category_id: "nodejs" })
+      .expect(200);
+
+    let rows = await all(
+      "SELECT difficulty, tags FROM questions WHERE id = ?",
+      [created.body.id],
+    );
+    assert.equal(rows[0].difficulty, "advanced", "difficulty must not reset");
+    assert.deepEqual(
+      JSON.parse(rows[0].tags),
+      ["caching", "streams"],
+      "tags must not be blanked",
+    );
+
+    // An explicit empty array is still meaningful: it clears the tags.
+    await api
+      .put(`/api/questions/${created.body.id}`)
+      .send({ question_text: "Edited text only", category_id: "nodejs", tags: [] })
+      .expect(200);
+
+    rows = await all("SELECT tags FROM questions WHERE id = ?", [created.body.id]);
+    assert.deepEqual(JSON.parse(rows[0].tags), []);
+
+    // As is an explicit difficulty, which is normalised on the way in.
+    await api
+      .put(`/api/questions/${created.body.id}`)
+      .send({
+        question_text: "Edited text only",
+        category_id: "nodejs",
+        difficulty: "not-a-level",
+      })
+      .expect(200);
+
+    rows = await all("SELECT difficulty FROM questions WHERE id = ?", [
+      created.body.id,
+    ]);
+    assert.equal(rows[0].difficulty, "intermediate");
+  });
+
+  test("ignores non-string answers instead of stringifying them", async () => {
+    const res = await api
+      .post("/api/questions")
+      .send({
+        category_id: "laravel-core",
+        question_text: "Junk answer probe",
+        answers: ["real answer", 42, null, "   ", { answer_text: "" }, { nope: 1 }],
+      })
+      .expect(201);
+
+    const answers = await all(
+      "SELECT answer_text FROM answers WHERE question_id = ? ORDER BY id",
+      [res.body.id],
+    );
+    assert.deepEqual(
+      answers.map((a) => a.answer_text),
+      ["real answer"],
+    );
+
+    await api.delete(`/api/questions/${res.body.id}`).expect(200);
   });
 
   test("defaults difficulty and tags when they are omitted", async () => {
@@ -392,6 +579,34 @@ describe("questions", () => {
     const junk = await api.get("/api/questions?limit=abc&page=xyz").expect(200);
     assert.equal(junk.body.limit, 20);
     assert.equal(junk.body.page, 1);
+  });
+
+  // Regression: a page past the end has no rows, but the envelope must still
+  // describe the whole result set. Reporting total 0 made the UI show "no
+  // results" and hide its pagination controls even though matches existed.
+  test("a page past the end still reports the full total", async () => {
+    // The test database starts with categories only, so the search half of this
+    // needs its own matching content to be meaningful.
+    await api
+      .post("/api/questions")
+      .send({
+        category_id: "laravel-core",
+        question_text: "Pagination total probe",
+        answers: ["Answers mentioning the probe term."],
+      })
+      .expect(201);
+
+    for (const url of [
+      "/api/questions?limit=5&page=9999",
+      "/api/search?q=probe&limit=5&page=9999",
+    ]) {
+      const beyond = await api.get(url).expect(200);
+      assert.deepEqual(beyond.body.items, [], `${url} returns no rows`);
+      assert.ok(
+        beyond.body.total > 0,
+        `${url} must keep the real total, got ${beyond.body.total}`,
+      );
+    }
   });
 
   test("updates question text and category without touching answers", async () => {

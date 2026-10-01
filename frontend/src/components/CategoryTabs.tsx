@@ -1,5 +1,6 @@
 import type { Category } from "../api/types";
 import type { Theme } from "../theme";
+import { withAlpha } from "../theme";
 import { ghostButtonStyle } from "./styles";
 
 interface CategoryTabsProps {
@@ -51,7 +52,7 @@ export function CategoryTabs({
                 border: active
                   ? `1.5px solid ${category.color}`
                   : `1.5px solid ${theme.border}`,
-                background: active ? `${category.color}18` : "transparent",
+                background: active ? withAlpha(category.color, "18") : "transparent",
                 color: active ? category.color : theme.mutedText,
                 cursor: "pointer",
                 fontSize: "0.85rem",

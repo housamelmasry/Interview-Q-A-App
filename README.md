@@ -69,13 +69,16 @@ Requires Docker with the Compose plugin.
 ```bash
 git clone https://github.com/housamelmasry/Interview.git
 cd Interview
-touch backend/.env        # Compose references this file; no values are required
 docker compose up --build
 ```
 
 - App: <http://localhost:5173>
 - API: <http://localhost:3000>
 - Swagger UI: <http://localhost:3000/api/docs>
+
+The frontend waits for the backend to pass its health check before starting, so
+the first page load will not race the API. The database is kept in a named Docker
+volume, which means `docker compose down` and rebuilds preserve your content.
 
 On first start the schema is migrated and the 10 categories are bootstrapped from `data.json`; both steps are idempotent, so restarts change nothing. Load the bundled questions and answers with:
 
@@ -158,6 +161,8 @@ Multi-word queries are `AND`ed first, because "service container" should not mat
 │   │   ├── search.js        # FTS5 match building, result merge, row grouping
 │   │   ├── openapi.json     # OpenAPI 3.0 specification (9 paths, 14 schemas)
 │   │   ├── seed-data.js     # Replaces DB content with data.json
+│   │   ├── repository.js    # Parameterised SQL and transactions per operation
+│   │   ├── validate.js      # Shared difficulty / answers / tags normalisation
 │   │   ├── server.js        # Express app, 15 routes, Swagger UI
 │   │   └── db/
 │   │       ├── migrate.js   # Versioned migration runner
@@ -167,15 +172,16 @@ Multi-word queries are `AND`ed first, because "service container" should not mat
 │   │           ├── 003-performance-indexes.js
 │   │           └── 004-full-text-search.js
 │   ├── test/
-│   │   └── api.test.js      # 52 API tests, 8 suites
+│   │   └── api.test.js      # 59 API tests, 8 suites
 │   ├── Dockerfile
 │   └── package.json
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx          # Composition root: 334 lines
-│   │   ├── App.test.tsx     # 41 component tests
+│   │   ├── App.test.tsx     # 42 component tests
+│   │   ├── theme.test.ts    # 6 colour-tint tests
 │   │   ├── constants.ts     # Page size, debounce delay, difficulty labels
-│   │   ├── theme.ts         # Theme object for both modes
+│   │   ├── theme.ts         # Theme object for both modes, withAlpha
 │   │   ├── api/
 │   │   │   ├── client.ts    # Typed fetch wrappers, ApiError, URL building
 │   │   │   └── types.ts     # Wire types mirroring the JSON exactly
@@ -244,8 +250,9 @@ The backend suite drives the real exported Express app in-process with Supertest
 - transactional writes: a create against a non-existent category leaves the question count unchanged
 - cascade deletes at both levels
 - CRUD for all three resources, including `201` on create and `404` on a no-op update or delete
+- input normalisation: unknown `difficulty` values fall back to `intermediate`, tags are slugged and capped at 6, blank answers are dropped, and an update that omits `answers` keeps the stored ones
 
-The frontend suite renders the real component tree in jsdom with `fetch` stubbed to an in-memory fake API that speaks the real paginated contract, and asserts through accessible queries (`getByRole`, `getByLabelText`) alongside `data-testid` hooks — so the tests double as accessibility checks. It covers initial load and error/retry, category navigation and the empty state, expanding questions, difficulty and tag rendering, debounced server-side search, out-of-order response cancellation, pagination controls, the theme toggle, and the manage-mode create/edit/delete flows.
+The frontend suite renders the real component tree in jsdom with `fetch` stubbed to an in-memory fake API that speaks the real paginated contract, and asserts through accessible queries (`getByRole`, `getByLabelText`) alongside `data-testid` hooks — so the tests double as accessibility checks. It covers initial load and error/retry, category navigation and the empty state, expanding questions, difficulty and tag rendering, debounced server-side search, out-of-order response cancellation, pagination controls, the theme toggle, and the manage-mode create/edit/delete flows. A separate `theme.test.ts` pins colour-tinting behaviour: tints are appended to 3-digit hex shorthands correctly, which is what keeps tag and category borders from silently disappearing in dark mode.
 
 See [SKILLS.md](SKILLS.md) for the skills these tests demonstrate.
 

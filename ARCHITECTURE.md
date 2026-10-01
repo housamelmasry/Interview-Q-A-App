@@ -203,7 +203,9 @@ user submits form
   └─ client catches, shows the server's error, keeps the form open, or reloads
 ```
 
-`PUT /api/questions/:id` treats a supplied `answers` array as the **complete desired set**: the previous rows are deleted and the new ones inserted inside the same transaction. Omitting `answers` leaves them untouched. Replace-not-patch is simpler and safer than diffing, and it is why the individual answer endpoints are not used by the UI.
+`PUT /api/questions/:id` treats a supplied `answers` array as the **complete desired set**: the previous rows are deleted and the new ones inserted inside the same transaction. Omitting `answers` leaves them untouched. Replace-not-patch for a child collection is simpler and safer than diffing, and it is why the individual answer endpoints are not used by the UI.
+
+The same presence semantics apply to the parent's own optional fields, because a caller patching one field should not clobber the rest. `difficulty` and `tags` are `undefined` when the key is absent, and `updateQuestion` builds its `SET` clause from the keys that are actually present. This was a real inconsistency for a while: `answers` honoured "absent means unchanged" while `tags` was defaulted to `[]` and `difficulty` to `intermediate`, so a text-only edit silently wiped a question's metadata. An explicit `[]` still clears tags, and an explicit unknown `difficulty` still normalises to `intermediate`, so the two are distinguishable in both directions.
 
 `POST /api/questions` also accepts `answers` as either plain strings or `{ answer_text }` objects, which is the same shape the seed file uses.
 
@@ -315,7 +317,7 @@ Applying `LIMIT`/`OFFSET` to *that* query is the classic pagination bug: the lim
 
 Both endpoints therefore page the **question ids** first and hydrate exactly those ids in a second statement. `hydrateSql(count)` builds its placeholder list from the actual id count rather than padding to a fixed width, so a one-row page sends one `?`. `groupRows` then collapses the flat rows back into the nested shape using a `Map`, so the client still gets one object per question with an `answers` array.
 
-The same pattern is applied to `GET /api/questions` (`server.js:210-233`), and `backend/test/api.test.js:351-382` is the regression test: three questions with three, two and one answers, page size 2, asserting the first page holds two questions, the second holds one, `total` is 3, and the pages do not overlap.
+The same pattern is applied to `GET /api/questions` (`server.js:187-196`), and `backend/test/api.test.js:538-570` is the regression test: three questions with three, two and one answers, page size 2, asserting the first page holds two questions, the second holds one, `total` is 3, and the pages do not overlap.
 
 ## API surface
 
@@ -408,7 +410,7 @@ Each render's effect creates a fresh `AbortController` and returns a cleanup tha
 
 ## Testing and CI
 
-**Backend — 52 tests, 8 suites** (`node:test` + Supertest) drive the real exported Express app in-process against a temporary SQLite file. No mocked database: real SQL, real migrations, real transactions, real cascades. Isolation comes from `DB_PATH`, set before the app is imported; the temp directory is removed afterwards. Coverage worth naming:
+**Backend — 59 tests, 8 suites** (`node:test` + Supertest) drive the real exported Express app in-process against a temporary SQLite file. No mocked database: real SQL, real migrations, real transactions, real cascades. Isolation comes from `DB_PATH`, set before the app is imported; the temp directory is removed afterwards. Coverage worth naming:
 
 | Area | What is asserted |
 | --- | --- |
@@ -420,8 +422,16 @@ Each render's effect creates a fresh `AbortController` and returns a cleanup tha
 | Transactions | a create whose category does not exist leaves the question count unchanged |
 | Cascades | deleting a category removes its questions and their answers; deleting a question removes its answers |
 | CRUD | full lifecycle per resource, `201` on create, `404` on no-op update/delete, `400` on missing fields |
+| Input normalisation | unknown `difficulty` falls back to `intermediate`; tags are trimmed, slugged, de-duplicated and capped at 6; blank answers are dropped |
+| Partial updates | omitting `answers`, `tags` or `difficulty` keeps the stored value, while an explicit `[]` clears tags or answers |
 
-**Frontend — 45 tests** across two files (Vitest + jsdom, Testing Library). 41 of them live in `App.test.tsx`, which renders the real `App` with `fetch` stubbed to deterministic fixtures and asserts through `getByRole`, `getByLabelText` and `getByTestId`, so the suite doubles as an accessibility check. The other 4 cover `useDebounce` directly via `renderHook`. `cleanup` and mock restoration run in `test/setup.ts` after every test.
+**Frontend — 52 tests** across three files (Vitest + jsdom, Testing Library). 42 of them live in `App.test.tsx`, which renders the real `App` with `fetch` stubbed to deterministic fixtures and asserts through `getByRole`, `getByLabelText` and `getByTestId`, so the suite doubles as an accessibility check. Four cover `useDebounce` directly via `renderHook`, and six cover `withAlpha` in `theme.test.ts`. `cleanup` and mock restoration run in `src/test/setup.ts` after every test.
+
+**Two frontend regressions worth naming, because both were invisible in the browser output.**
+
+*The tag pill had no border in dark mode.* Components tinted a colour by appending alpha digits to the hex string (`` `${theme.mutedText}44` ``). That is only safe for 6-digit hex. The dark muted colour is the 3-digit shorthand `#666`, so the concatenation produced `#66644` — five hex digits, an invalid colour. Browsers and jsdom both discard an invalid colour, and because it was the only value in the `border` shorthand, the entire declaration vanished and the pill rendered with no border at all. `withAlpha` in `theme.ts` now expands 3-digit shorthand to 6 digits before appending, so the result is always a valid 8-digit `#rrggbbaa`, and passes non-hex values such as `transparent` and `rgb(...)` through untouched. `theme.test.ts` asserts that every theme field in both modes stays a valid hex colour, which is the check that would have caught it.
+
+*The same pill also mixed CSS shorthand and longhand.* It spread `badgeStyle` — which sets the `border` shorthand — and then overrode only `borderStyle`. React warns whenever a style update mixes the two, and the surviving declaration depends on property order. Writing the whole border in one shorthand removed the warning. The assertion reads the serialised `style` attribute rather than `el.style`, because jsdom normalises an 8-digit hex to `rgba()`, and a `border` shorthand containing a dropped colour is exactly the failure being guarded against.
 
 **A testing gotcha worth recording.** `userEvent` deadlocks under Vitest fake timers: Testing Library's async wrapper awaits its own work, and that only advances Jest's clock, so the awaited interaction never resolves. Debounce behaviour is therefore tested by driving a `fireEvent.change` burst (`"e"`, `"ev"`, `"event loop"`) and asserting at the debounce boundary — no request at `DEBOUNCE_MS - 1`, exactly one request for the final value after `+1`. `userEvent` is still used everywhere real timers are in play.
 
@@ -462,11 +472,21 @@ The frontend reads its API URL once at module scope from `import.meta.env.VITE_A
 
 ```text
 docker-compose.yml
-├── backend   build ./backend   :3000   volume ./backend:/app   env_file ./backend/.env
-└── frontend  build ./frontend  :5173   volume ./frontend:/app  depends_on backend
+├── backend   build ./backend   :3000   volumes ./backend:/app, /app/node_modules, data:/data
+│                      healthcheck GET /api/health   DB_PATH=/data/interview_guide.db
+└── frontend  build ./frontend  :5173   volumes ./frontend:/app, /app/node_modules
+                       depends_on backend (condition: service_healthy)
+
+volumes: data   (named, holds the SQLite file)
 ```
 
-Both images use `node:20-alpine`, install from lockfiles, and run the dev server. Compose references `backend/.env` through `env_file`, so an empty file is needed for a fresh clone.
+Both images use `node:20-alpine`, install from lockfiles, and run the dev server. Three details matter:
+
+- **`/app/node_modules` is masked by an anonymous volume** in each service. The bind mount would otherwise expose the host's modules, which are built for the host OS; `sqlite3` is a native module and fails to load when the wrong one wins. The anonymous volume keeps the image's Linux modules while still allowing hot reload of source.
+- **The database lives in a named volume**, not in the bind mount. A bind-mounted `./backend` would put the SQLite file inside the developer's working tree, where it is easy to commit by accident and awkward to reset; the named volume also survives `docker compose down` and rebuilds.
+- **The frontend waits on `service_healthy`** rather than merely `depends_on`, which only orders container start. Without the health check the first page load races migrations and fails, which is exactly the confusing first-run experience the health check removes.
+
+No `.env` file is required: configuration is passed as explicit `environment` entries, so a fresh clone starts with no setup step.
 
 ## Design decisions and trade-offs
 

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import type { Theme } from "../theme";
+import { withAlpha } from "../theme";
 
 /** Text inputs, selects and textareas all share the same box. */
 export const fieldStyle = (theme: Theme): CSSProperties => ({
@@ -57,8 +58,8 @@ export const ghostButtonStyle: CSSProperties = {
 export const badgeStyle = (color: string): CSSProperties => ({
   fontSize: "0.7rem",
   color,
-  border: `1px solid ${color}44`,
-  background: `${color}18`,
+  border: `1px solid ${withAlpha(color, "44")}`,
+  background: withAlpha(color, "18"),
   padding: "2px 8px",
   borderRadius: "20px",
   whiteSpace: "nowrap",

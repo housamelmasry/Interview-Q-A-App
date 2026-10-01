@@ -1,60 +1,47 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
-import db, { ready } from "./database.js";
-import { searchQuestions, groupRows, safeParseTags } from "./search.js";
+
+import { ready } from "./database.js";
+import { messageForError, statusForError } from "./errors.js";
+import * as repo from "./repository.js";
+import {
+  normaliseAnswers,
+  normaliseDifficulty,
+  normaliseTags,
+} from "./validate.js";
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
+// ---------------------------------------------------------------------------
 // Interactive API documentation (OpenAPI 3 spec -> Swagger UI)
+// ---------------------------------------------------------------------------
+
 const openapiSpec = JSON.parse(
   fs.readFileSync(path.join(__dirname, "openapi.json"), "utf8"),
 );
 app.get("/api/openapi.json", (_req, res) => res.json(openapiSpec));
-app.use(
-  "/api/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(openapiSpec, { explorer: true }),
-);
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec, { explorer: true }));
 
 // ---------------------------------------------------------------------------
-// Query helpers
+// Pagination
 // ---------------------------------------------------------------------------
-
-const run = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve({ changes: this.changes, lastID: this.lastID });
-    });
-  });
-
-const all = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
-  });
-
-const get = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
-  });
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 /**
- * Reads and validates `page` and `limit` query parameters. `page` is 1-based.
- * Invalid or out-of-range values fall back to defaults rather than erroring, so
- * a malformed link still renders something useful.
+ * Reads and validates `page` and `limit`, which are 1-based and clamped.
+ *
+ * Out-of-range or unparseable values fall back to defaults rather than erroring,
+ * so a malformed link still renders something useful instead of an error page.
  */
 function parsePagination(query) {
   const rawLimit = Number.parseInt(query.limit, 10);
@@ -65,16 +52,17 @@ function parsePagination(query) {
     : DEFAULT_LIMIT;
   const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  return { limit, page, offset: (page - 1) * limit };
+  return { limit, page };
 }
 
-function buildEnvelope(items, total, { limit, page }) {
+/** Wraps a page of items in the shape the client paginates against. */
+function envelope(items, total, { limit, page }) {
   return {
     items,
     total,
     page,
     limit,
-    pages: limit > 0 ? Math.max(1, Math.ceil(total / limit)) : 1,
+    pages: Math.max(1, Math.ceil(total / limit)),
   };
 }
 
@@ -86,25 +74,9 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "OK" });
 });
 
-/** Aggregate counts used for the header summary and per-category tab badges. */
+/** Aggregate counts used for the header summary and category tab badges. */
 app.get("/api/stats", async (_req, res) => {
-  try {
-    const [totals, perCategory] = await Promise.all([
-      get(`SELECT
-             (SELECT COUNT(*) FROM categories) AS total_categories,
-             (SELECT COUNT(*) FROM questions)  AS total_questions,
-             (SELECT COUNT(*) FROM answers)    AS total_answers`),
-      all(`SELECT c.id, c.label, c.icon, c.color, COUNT(q.id) AS question_count
-              FROM categories c
-              LEFT JOIN questions q ON q.category_id = c.id
-             GROUP BY c.id
-             ORDER BY c.label`),
-    ]);
-
-    res.json({ ...totals, categories: perCategory });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json(await repo.getStats());
 });
 
 // ---------------------------------------------------------------------------
@@ -112,18 +84,7 @@ app.get("/api/stats", async (_req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get("/api/categories", async (_req, res) => {
-  try {
-    const rows = await all(`
-      SELECT c.id, c.label, c.icon, c.color, COUNT(q.id) AS question_count
-        FROM categories c
-        LEFT JOIN questions q ON q.category_id = c.id
-       GROUP BY c.id
-       ORDER BY c.label
-    `);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json(await repo.listCategories());
 });
 
 app.post("/api/categories", async (req, res) => {
@@ -135,15 +96,8 @@ app.post("/api/categories", async (req, res) => {
       .json({ error: "Category ID and label are required" });
   }
 
-  try {
-    await run(
-      "INSERT INTO categories (id, label, icon, color) VALUES (?, ?, ?, ?)",
-      [id, label, icon || "", color || "#666666"],
-    );
-    res.status(201).json({ id, message: "Category added successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  await repo.createCategory({ id, label, icon, color });
+  res.status(201).json({ id, message: "Category added successfully" });
 });
 
 app.put("/api/categories/:id", async (req, res) => {
@@ -154,31 +108,21 @@ app.put("/api/categories/:id", async (req, res) => {
     return res.status(400).json({ error: "Category label is required" });
   }
 
-  try {
-    const result = await run(
-      "UPDATE categories SET label = ?, icon = ?, color = ? WHERE id = ?",
-      [label, icon || "", color || "#666666", id],
-    );
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Category not found" });
-    }
-    res.json({ message: "Category updated successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const { changes } = await repo.updateCategory(id, { label, icon, color });
+  if (changes === 0) {
+    return res.status(404).json({ error: "Category not found" });
   }
+
+  res.json({ message: "Category updated successfully" });
 });
 
 app.delete("/api/categories/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await run("DELETE FROM categories WHERE id = ?", [id]);
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Category not found" });
-    }
-    res.json({ message: "Category deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const { changes } = await repo.deleteCategory(req.params.id);
+  if (changes === 0) {
+    return res.status(404).json({ error: "Category not found" });
   }
+
+  res.json({ message: "Category deleted successfully" });
 });
 
 // ---------------------------------------------------------------------------
@@ -186,209 +130,129 @@ app.delete("/api/categories/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Lists questions with their answers, optionally filtered by category and
- * paginated. Responds with a `{ items, total, page, limit, pages }` envelope so
- * the client can render pagination controls without a second request.
+ * Validates and normalises the shared create/post question payload.
+ *
+ * Only `category_id` and `question_text` are required. The rest default sensibly
+ * for a create: no difficulty means `intermediate`, no tags means none, no
+ * answers means none.
  */
+function readCreateInput(body) {
+  const { category_id, question_text, answers, difficulty, tags } = body;
+
+  if (!category_id || !question_text) {
+    return { error: "Category ID and question text are required" };
+  }
+
+  return {
+    value: {
+      category_id,
+      question_text: question_text.trim(),
+      difficulty: normaliseDifficulty(difficulty),
+      tags: JSON.stringify(normaliseTags(tags)),
+      answers: normaliseAnswers(answers),
+    },
+  };
+}
+
+/**
+ * Validates and normalises an update payload.
+ *
+ * Unlike create, an absent key means "leave this field as it is", so a caller can
+ * patch one field without clobbering the others. That is why every optional value
+ * is `undefined` rather than defaulted: the repository builds its `SET` clause
+ * from the keys that are actually present.
+ */
+function readUpdateInput(body) {
+  const { category_id, question_text, answers, difficulty, tags } = body;
+
+  if (!category_id || !question_text) {
+    return { error: "Category ID and question text are required" };
+  }
+
+  return {
+    value: {
+      category_id,
+      question_text: question_text.trim(),
+      difficulty: Object.hasOwn(body, "difficulty")
+        ? normaliseDifficulty(difficulty)
+        : undefined,
+      tags: Object.hasOwn(body, "tags")
+        ? JSON.stringify(normaliseTags(tags))
+        : undefined,
+      // An explicit empty array is a deliberate instruction to remove them all.
+      answers: Object.hasOwn(body, "answers") ? normaliseAnswers(answers) : null,
+    },
+  };
+}
+
 app.get("/api/questions", async (req, res) => {
-  const { category } = req.query;
   const pagination = parsePagination(req.query);
 
-  const where = category ? "WHERE q.category_id = ?" : "";
-  const params = category ? [category] : [];
+  const { items, total } = await repo.listQuestions({
+    category: req.query.category,
+    limit: pagination.limit,
+    offset: (pagination.page - 1) * pagination.limit,
+  });
 
-  try {
-    const countRow = await get(
-      `SELECT COUNT(*) AS count FROM questions q ${where}`,
-      params,
-    );
-
-    if (countRow.count === 0) {
-      return res.json(buildEnvelope([], 0, pagination));
-    }
-
-    // Paginate on questions first, then attach their answers. Applying LIMIT to
-    // the joined rows directly would let a question's answer count eat into the
-    // page size, so a page of 20 could return as few as 7 questions.
-    const idRows = await all(
-      `SELECT q.id FROM questions q ${where} ORDER BY q.id LIMIT ? OFFSET ?`,
-      [...params, pagination.limit, pagination.offset],
-    );
-
-    if (idRows.length === 0) {
-      return res.json(buildEnvelope([], countRow.count, pagination));
-    }
-
-    const ids = idRows.map((r) => r.id);
-    const rows = await all(
-      `SELECT q.id, q.question_text, q.category_id, q.difficulty, q.tags,
-              c.label AS category_label, c.icon, c.color,
-              a.id AS answer_id, a.answer_text
-         FROM questions q
-         JOIN categories c ON c.id = q.category_id
-         LEFT JOIN answers a ON a.question_id = q.id
-        WHERE q.id IN (${ids.map(() => "?").join(",")})
-        ORDER BY q.id, a.id`,
-      ids,
-    );
-
-    res.json(buildEnvelope(groupRows(rows), countRow.count, pagination));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json(envelope(items, total, pagination));
 });
 
-/** Full-text search across question and answer text, paginated. */
 app.get("/api/search", async (req, res) => {
   const { q } = req.query;
   const pagination = parsePagination(req.query);
 
   if (!q || !String(q).trim()) {
-    return res.json(buildEnvelope([], 0, pagination));
+    return res.json(envelope([], 0, pagination));
   }
 
-  try {
-    const { items, total } = await searchQuestions(db, q, {
-      limit: pagination.limit,
-      offset: pagination.offset,
-    });
-    res.json(buildEnvelope(items, total, pagination));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  const { items, total } = await repo.searchAllQuestions({
+    term: q,
+    limit: pagination.limit,
+    offset: (pagination.page - 1) * pagination.limit,
+  });
+
+  res.json(envelope(items, total, pagination));
 });
 
 app.post("/api/questions", async (req, res) => {
-  const { category_id, question_text, answers, difficulty, tags } = req.body;
+  const { value, error } = readCreateInput(req.body);
+  if (error) return res.status(400).json({ error });
 
-  if (!category_id || !question_text) {
-    return res
-      .status(400)
-      .json({ error: "Category ID and question text are required" });
-  }
+  const id = await repo.createQuestion(value);
 
-  const answerList = Array.isArray(answers) ? answers : [];
-  const difficultyValue = difficulty || "intermediate";
-  const tagsValue = Array.isArray(tags) ? JSON.stringify(tags) : "[]";
-
-  try {
-    // The question and its answers must land together, so the whole insert is
-    // wrapped in a transaction: a failure on the last answer cannot leave an
-    // orphaned question behind.
-    await run("BEGIN");
-    try {
-      const result = await run(
-        `INSERT INTO questions (category_id, question_text, difficulty, tags)
-         VALUES (?, ?, ?, ?)`,
-        [category_id, question_text, difficultyValue, tagsValue],
-      );
-      const questionId = result.lastID;
-
-      let inserted = 0;
-      for (const answer of answerList) {
-        const text =
-          typeof answer === "string" ? answer : answer?.answer_text;
-        if (typeof text === "string" && text.trim()) {
-          await run(
-            "INSERT INTO answers (question_id, answer_text) VALUES (?, ?)",
-            [questionId, text],
-          );
-          inserted += 1;
-        }
-      }
-
-      await run("COMMIT");
-      res.status(201).json({
-        id: questionId,
-        message:
-          inserted > 0
-            ? "Question and answers added successfully"
-            : "Question added successfully",
-      });
-    } catch (innerError) {
-      await run("ROLLBACK");
-      throw innerError;
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.status(201).json({
+    id,
+    message:
+      value.answers.length > 0
+        ? "Question and answers added successfully"
+        : "Question added successfully",
+  });
 });
 
-/**
- * Updates a question. When `answers` is supplied it is treated as the complete
- * desired answer set: the previous rows are deleted and the new ones inserted.
- * All of it happens in one transaction, so a failure part-way through can never
- * leave a question with a half-replaced answer set.
- */
 app.put("/api/questions/:id", async (req, res) => {
-  const { id } = req.params;
-  const { question_text, category_id, answers, difficulty, tags } = req.body;
+  const { value, error } = readUpdateInput(req.body);
+  if (error) return res.status(400).json({ error });
 
-  if (!question_text || !category_id) {
-    return res
-      .status(400)
-      .json({ error: "Category ID and question text are required" });
+  const answersProvided = value.answers !== null;
+  const found = await repo.updateQuestion({ ...value, id: req.params.id });
+  if (!found) {
+    return res.status(404).json({ error: "Question not found" });
   }
 
-  const difficultyValue = difficulty || "intermediate";
-  const tagsValue = Array.isArray(tags) ? JSON.stringify(tags) : "[]";
-  const hasAnswers = Array.isArray(answers);
-
-  try {
-    await run("BEGIN");
-    try {
-      const updated = await run(
-        `UPDATE questions
-            SET question_text = ?, category_id = ?, difficulty = ?, tags = ?
-          WHERE id = ?`,
-        [question_text, category_id, difficultyValue, tagsValue, id],
-      );
-
-      if (updated.changes === 0) {
-        await run("ROLLBACK");
-        return res.status(404).json({ error: "Question not found" });
-      }
-
-      if (hasAnswers) {
-        await run("DELETE FROM answers WHERE question_id = ?", [id]);
-        for (const answer of answers) {
-          const text =
-            typeof answer === "string" ? answer : answer?.answer_text;
-          if (text) {
-            await run(
-              "INSERT INTO answers (question_id, answer_text) VALUES (?, ?)",
-              [id, text],
-            );
-          }
-        }
-      }
-
-      await run("COMMIT");
-      res.json({
-        message: hasAnswers
-          ? "Question and answers updated successfully"
-          : "Question updated successfully",
-      });
-    } catch (innerError) {
-      await run("ROLLBACK");
-      throw innerError;
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json({
+    message: answersProvided
+      ? "Question and answers updated successfully"
+      : "Question updated successfully",
+  });
 });
 
 app.delete("/api/questions/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await run("DELETE FROM questions WHERE id = ?", [id]);
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Question not found" });
-    }
-    res.json({ message: "Question deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const { changes } = await repo.deleteQuestion(req.params.id);
+  if (changes === 0) {
+    return res.status(404).json({ error: "Question not found" });
   }
+
+  res.json({ message: "Question deleted successfully" });
 });
 
 // ---------------------------------------------------------------------------
@@ -396,51 +260,54 @@ app.delete("/api/questions/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get("/api/answers/:questionId", async (req, res) => {
-  const { questionId } = req.params;
-  try {
-    const rows = await all(
-      "SELECT * FROM answers WHERE question_id = ? ORDER BY id",
-      [questionId],
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json(await repo.listAnswers(req.params.questionId));
 });
 
 app.put("/api/answers/:id", async (req, res) => {
-  const { id } = req.params;
   const { answer_text } = req.body;
 
   if (!answer_text) {
     return res.status(400).json({ error: "Answer text is required" });
   }
 
-  try {
-    const result = await run(
-      "UPDATE answers SET answer_text = ? WHERE id = ?",
-      [answer_text, id],
-    );
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Answer not found" });
-    }
-    res.json({ message: "Answer updated successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const { changes } = await repo.updateAnswer(req.params.id, answer_text);
+  if (changes === 0) {
+    return res.status(404).json({ error: "Answer not found" });
   }
+
+  res.json({ message: "Answer updated successfully" });
 });
 
 app.delete("/api/answers/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await run("DELETE FROM answers WHERE id = ?", [id]);
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Answer not found" });
-    }
-    res.json({ message: "Answer deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const { changes } = await repo.deleteAnswer(req.params.id);
+  if (changes === 0) {
+    return res.status(404).json({ error: "Answer not found" });
   }
+
+  res.json({ message: "Answer deleted successfully" });
+});
+
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
+/**
+ * Terminal error handler, mounted after every route.
+ *
+ * Handlers are `async`, and Express 5 forwards a rejected promise to here on its
+ * own, so no route needs its own try/catch. Keeping the catch in one place is
+ * what guarantees a database failure can never leave a response hanging.
+ *
+ * The status and message come from `errors.js` rather than defaulting everything
+ * to 500, so a duplicate id or a bad foreign key is reported as the client error
+ * it is instead of asking the user to retry something that cannot succeed.
+ */
+// eslint-disable-next-line no-unused-vars -- Express identifies error handlers by arity
+app.use((err, _req, res, _next) => {
+  const status = statusForError(err);
+  if (status >= 500) console.error("Unhandled request error:", err);
+
+  res.status(status).json({ error: messageForError(err, status) });
 });
 
 // ---------------------------------------------------------------------------

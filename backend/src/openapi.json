@@ -4,22 +4,45 @@
     "title": "Arabic Interview Guide API",
     "version": "2.0.0",
     "description": "REST API backing the Arabic Interview Guide, a full-stack technical interview preparation app. Questions are grouped into categories and each question owns one or more answers. Features include full-text search, pagination, and difficulty/tags metadata.\n\nAll data is served from a local SQLite database. **This API has no authentication** - it is intended for local development and demonstration.",
-    "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" }
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
   },
   "servers": [
-    { "url": "http://localhost:3000", "description": "Local development" }
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
   ],
   "tags": [
-    { "name": "System", "description": "Health and discovery" },
-    { "name": "Categories", "description": "Guide sections and their display metadata" },
-    { "name": "Questions", "description": "Interview questions and their nested answers" },
-    { "name": "Search", "description": "Full-text search across question and answer text" },
-    { "name": "Answers", "description": "Answers belonging to a single question" }
+    {
+      "name": "System",
+      "description": "Health and discovery"
+    },
+    {
+      "name": "Categories",
+      "description": "Guide sections and their display metadata"
+    },
+    {
+      "name": "Questions",
+      "description": "Interview questions and their nested answers"
+    },
+    {
+      "name": "Search",
+      "description": "Full-text search across question and answer text"
+    },
+    {
+      "name": "Answers",
+      "description": "Answers belonging to a single question"
+    }
   ],
   "paths": {
     "/api/health": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Health check",
         "description": "Returns OK when the API is reachable. Useful for container health probes and uptime checks.",
         "responses": {
@@ -27,8 +50,12 @@
             "description": "Service is healthy",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" },
-                "example": { "status": "OK" }
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "OK"
+                }
               }
             }
           }
@@ -37,7 +64,9 @@
     },
     "/api/stats": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Aggregate counts and per-category counts",
         "description": "Returns the total number of categories, questions and answers, plus every category with its `question_count`. Categories are ordered alphabetically by label, matching `GET /api/categories`. Drives the header summary and the per-category tab badges.",
         "responses": {
@@ -45,7 +74,9 @@
             "description": "Totals and per-category counts",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StatsResponse" },
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                },
                 "example": {
                   "total_categories": 8,
                   "total_questions": 61,
@@ -65,14 +96,22 @@
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/categories": {
       "get": {
-        "tags": ["Categories"],
+        "tags": [
+          "Categories"
+        ],
         "summary": "List categories",
         "description": "Returns every category ordered alphabetically by label.",
         "responses": {
@@ -80,26 +119,46 @@
             "description": "List of categories",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } }
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Category"
+                  }
+                }
               }
             }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "post": {
-        "tags": ["Categories"],
+        "tags": [
+          "Categories"
+        ],
         "summary": "Create a category",
         "description": "The `id` is a caller-supplied slug and is not auto-generated, so it can be used as a stable route segment.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CategoryInput" },
-              "example": { "id": "devops", "label": "DevOps", "icon": "⚙️", "color": "#00B8D9" }
+              "schema": {
+                "$ref": "#/components/schemas/CategoryInput"
+              },
+              "example": {
+                "id": "devops",
+                "label": "DevOps",
+                "icon": "⚙️",
+                "color": "#00B8D9"
+              }
             }
           }
         },
@@ -108,8 +167,13 @@
             "description": "Category created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/MessageWithId" },
-                "example": { "id": "devops", "message": "Category added successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageWithId"
+                },
+                "example": {
+                  "id": "devops",
+                  "message": "Category added successfully"
+                }
               }
             }
           },
@@ -117,32 +181,58 @@
             "description": "`id` or `label` missing",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Category ID and label are required" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Category ID and label are required"
+                }
               }
             }
           },
           "500": {
             "description": "Database error, e.g. a duplicate `id`",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/categories/{id}": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "devops" }
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "example": "devops"
+        }
       ],
       "put": {
-        "tags": ["Categories"],
+        "tags": [
+          "Categories"
+        ],
         "summary": "Update a category",
         "description": "The `id` is immutable; it is matched from the URL. Omitted `icon` or `color` fields fall back to `\"\"` and `\"#666666\"` respectively.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CategoryInput" },
-              "example": { "label": "DevOps & SRE", "icon": "⚙️", "color": "#00B8D9" }
+              "schema": {
+                "$ref": "#/components/schemas/CategoryInput"
+              },
+              "example": {
+                "label": "DevOps & SRE",
+                "icon": "⚙️",
+                "color": "#00B8D9"
+              }
             }
           }
         },
@@ -151,32 +241,54 @@
             "description": "Category updated",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Category updated successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Category updated successfully"
+                }
               }
             }
           },
           "400": {
             "description": "`label` missing",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "404": {
             "description": "No category with that id",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Category not found" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Category not found"
+                }
               }
             }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "delete": {
-        "tags": ["Categories"],
+        "tags": [
+          "Categories"
+        ],
         "summary": "Delete a category",
         "description": "Cascades: every question in the category and every answer on those questions is deleted too. This is enforced by `ON DELETE CASCADE` foreign keys.",
         "responses": {
@@ -184,25 +296,43 @@
             "description": "Category and its dependent records deleted",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Category deleted successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Category deleted successfully"
+                }
               }
             }
           },
           "404": {
             "description": "No category with that id",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/questions": {
       "get": {
-        "tags": ["Questions"],
+        "tags": [
+          "Questions"
+        ],
         "summary": "List questions with their answers",
         "description": "Returns a paginated envelope of questions, each carrying its category metadata, difficulty, tags and a nested `answers` array. Answers are ordered oldest first.\n\n`page` is 1-based and `limit` defaults to 20 and is clamped to a maximum of 100; invalid values fall back to the defaults instead of erroring. Pagination counts questions, not joined rows, so a question with three answers still occupies one slot on the page.",
         "parameters": [
@@ -211,7 +341,9 @@
             "in": "query",
             "required": false,
             "description": "Restrict results to one category id.",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "example": "laravel-core"
           },
           {
@@ -219,7 +351,11 @@
             "in": "query",
             "required": false,
             "description": "1-based page number. Defaults to 1; values below 1 or non-numeric values fall back to 1.",
-            "schema": { "type": "integer", "minimum": 1, "default": 1 },
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
             "example": 1
           },
           {
@@ -227,7 +363,12 @@
             "in": "query",
             "required": false,
             "description": "Page size. Defaults to 20 and is clamped to the range 1-100.",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
             "example": 20
           }
         ],
@@ -236,7 +377,9 @@
             "description": "A page of questions, each with its category metadata and answers",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PaginatedQuestions" },
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedQuestions"
+                },
                 "example": {
                   "items": [
                     {
@@ -247,9 +390,14 @@
                       "icon": "🔴",
                       "color": "#FF4444",
                       "difficulty": "intermediate",
-                      "tags": ["architecture"],
+                      "tags": [
+                        "architecture"
+                      ],
                       "answers": [
-                        { "id": 1, "answer_text": "The container binds class names to concrete instances." }
+                        {
+                          "id": 1,
+                          "answer_text": "The container binds class names to concrete instances."
+                        }
                       ]
                     }
                   ],
@@ -263,23 +411,36 @@
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "post": {
-        "tags": ["Questions"],
+        "tags": [
+          "Questions"
+        ],
         "summary": "Create a question, optionally with answers",
         "description": "The question and its answers are inserted inside a single transaction. If any answer insert fails the whole question is rolled back, so a question is never persisted with partial answers. Accepts answers as plain strings or as objects with an `answer_text` field.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/QuestionInput" },
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              },
               "example": {
                 "category_id": "laravel-core",
                 "question_text": "Explain the service container.",
-                "answers": ["It resolves and injects dependencies.", "Bindings are registered in a service provider."]
+                "answers": [
+                  "It resolves and injects dependencies.",
+                  "Bindings are registered in a service provider."
+                ]
               }
             }
           }
@@ -289,8 +450,13 @@
             "description": "Question created, with the new id",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/MessageWithId" },
-                "example": { "id": 62, "message": "Question and answers added successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageWithId"
+                },
+                "example": {
+                  "id": 62,
+                  "message": "Question and answers added successfully"
+                }
               }
             }
           },
@@ -298,21 +464,33 @@
             "description": "`category_id` or `question_text` missing",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Category ID and question text are required" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Category ID and question text are required"
+                }
               }
             }
           },
           "500": {
             "description": "Database error, e.g. an unknown `category_id`",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/search": {
       "get": {
-        "tags": ["Search"],
+        "tags": [
+          "Search"
+        ],
         "summary": "Full-text search across questions and answers",
         "description": "Returns the same paginated envelope as `GET /api/questions`, ordered so that questions whose own text matched rank above questions that matched only through an answer.\n\nSearch runs against SQLite FTS5 over both question text and answer text. Input is sanitised before matching - punctuation is stripped, tokens are quoted so FTS operators are inert, at most 8 tokens are used, and the final token is prefix-matched so results narrow as you type. Multi-word queries are ANDed and fall back to OR when AND yields nothing, which is needed for Arabic definite articles.\n\nA missing, empty or whitespace-only `q` is not an error: the response is 200 with an empty `items` array and `total` 0. Results are not filtered by category.",
         "parameters": [
@@ -321,7 +499,9 @@
             "in": "query",
             "required": false,
             "description": "Search term. An empty or whitespace-only value returns an empty result set with a 200 response rather than an error.",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "example": "dependency injection"
           },
           {
@@ -329,7 +509,11 @@
             "in": "query",
             "required": false,
             "description": "1-based page number. Defaults to 1; values below 1 or non-numeric values fall back to 1.",
-            "schema": { "type": "integer", "minimum": 1, "default": 1 },
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
             "example": 1
           },
           {
@@ -337,7 +521,12 @@
             "in": "query",
             "required": false,
             "description": "Page size. Defaults to 20 and is clamped to the range 1-100.",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
             "example": 20
           }
         ],
@@ -346,7 +535,9 @@
             "description": "A page of matching questions, ranked by relevance",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PaginatedQuestions" },
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedQuestions"
+                },
                 "example": {
                   "items": [
                     {
@@ -357,9 +548,14 @@
                       "icon": "🔴",
                       "color": "#FF4444",
                       "difficulty": "intermediate",
-                      "tags": ["architecture"],
+                      "tags": [
+                        "architecture"
+                      ],
                       "answers": [
-                        { "id": 1, "answer_text": "The container binds class names to concrete instances." }
+                        {
+                          "id": 1,
+                          "answer_text": "The container binds class names to concrete instances."
+                        }
                       ]
                     }
                   ],
@@ -373,28 +569,48 @@
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/questions/{id}": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          },
+          "example": 1
+        }
       ],
       "put": {
-        "tags": ["Questions"],
+        "tags": [
+          "Questions"
+        ],
         "summary": "Update a question and its answers",
         "description": "When `answers` is present the existing answers are deleted and the supplied list is inserted instead, inside one transaction. The `answers` array is therefore the full desired end state, not a patch. Omitting `answers` updates the question text and category only and leaves existing answers untouched.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/QuestionUpdateInput" },
+              "schema": {
+                "$ref": "#/components/schemas/QuestionUpdateInput"
+              },
               "example": {
                 "question_text": "Explain the service container.",
                 "category_id": "laravel-advanced",
-                "answers": ["Updated answer text."]
+                "answers": [
+                  "Updated answer text."
+                ]
               }
             }
           }
@@ -404,8 +620,12 @@
             "description": "Question updated",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Question and answers updated successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Question and answers updated successfully"
+                }
               }
             }
           },
@@ -413,23 +633,41 @@
             "description": "`category_id` or `question_text` missing",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Category ID and question text are required" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Category ID and question text are required"
+                }
               }
             }
           },
           "404": {
             "description": "No question with that id",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "500": {
             "description": "Database error, e.g. an unknown `category_id`",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "delete": {
-        "tags": ["Questions"],
+        "tags": [
+          "Questions"
+        ],
         "summary": "Delete a question",
         "description": "Cascades to the question's answers.",
         "responses": {
@@ -437,60 +675,119 @@
             "description": "Question and its answers deleted",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Question deleted successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Question deleted successfully"
+                }
               }
             }
           },
           "404": {
             "description": "No question with that id",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/answers/{questionId}": {
       "get": {
-        "tags": ["Answers"],
+        "tags": [
+          "Answers"
+        ],
         "summary": "List answers for a question",
         "description": "Returns raw answer rows ordered by id. The question list endpoint already nests answers, so this is mainly a direct-access convenience route.",
         "parameters": [
-          { "name": "questionId", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 1
+          }
         ],
         "responses": {
           "200": {
             "description": "Answers belonging to the question",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Answer" } }
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Answer"
+                  }
+                }
               }
             }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/answers/{id}": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          },
+          "example": 1
+        }
       ],
       "put": {
-        "tags": ["Answers"],
+        "tags": [
+          "Answers"
+        ],
         "summary": "Update a single answer",
         "description": "Updates one answer row in isolation, without touching sibling answers.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "type": "object", "required": ["answer_text"], "properties": { "answer_text": { "type": "string" } } },
-              "example": { "answer_text": "Refined answer explanation." }
+              "schema": {
+                "type": "object",
+                "required": [
+                  "answer_text"
+                ],
+                "properties": {
+                  "answer_text": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "answer_text": "Refined answer explanation."
+              }
             }
           }
         },
@@ -499,8 +796,12 @@
             "description": "Answer updated",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Answer updated successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Answer updated successfully"
+                }
               }
             }
           },
@@ -508,8 +809,12 @@
             "description": "`answer_text` missing",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Answer text is required" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Answer text is required"
+                }
               }
             }
           },
@@ -517,37 +822,65 @@
             "description": "No answer with that id",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "error": "Answer not found" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Answer not found"
+                }
               }
             }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "delete": {
-        "tags": ["Answers"],
+        "tags": [
+          "Answers"
+        ],
         "summary": "Delete a single answer",
         "responses": {
           "200": {
             "description": "Answer deleted",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Message" },
-                "example": { "message": "Answer deleted successfully" }
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Answer deleted successfully"
+                }
               }
             }
           },
           "404": {
             "description": "No answer with that id",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "500": {
             "description": "Database error",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -558,53 +891,123 @@
       "Category": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "description": "Caller-supplied slug used as the primary key.", "example": "laravel-core" },
-          "label": { "type": "string", "description": "Display name shown on the tab.", "example": "Laravel Core" },
-          "icon": { "type": "string", "description": "Emoji rendered beside the label.", "example": "🔴" },
-          "color": { "type": "string", "description": "Hex colour used for the active tab, counters and answer borders.", "example": "#FF4444" },
-          "question_count": { "type": "integer", "description": "Number of questions in this category. Counted by a LEFT JOIN, so categories with no questions report 0.", "example": 12 }
+          "id": {
+            "type": "string",
+            "description": "Caller-supplied slug used as the primary key.",
+            "example": "laravel-core"
+          },
+          "label": {
+            "type": "string",
+            "description": "Display name shown on the tab.",
+            "example": "Laravel Core"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Emoji rendered beside the label.",
+            "example": "🔴"
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex colour used for the active tab, counters and answer borders.",
+            "example": "#FF4444"
+          },
+          "question_count": {
+            "type": "integer",
+            "description": "Number of questions in this category. Counted by a LEFT JOIN, so categories with no questions report 0.",
+            "example": 12
+          }
         }
       },
       "CategoryInput": {
         "type": "object",
-        "required": ["label"],
+        "required": [
+          "label"
+        ],
         "properties": {
-          "id": { "type": "string", "description": "Required on create, ignored on update.", "example": "devops" },
-          "label": { "type": "string", "example": "DevOps" },
-          "icon": { "type": "string", "example": "⚙️" },
-          "color": { "type": "string", "example": "#00B8D9" }
+          "id": {
+            "type": "string",
+            "description": "Required on create, ignored on update.",
+            "example": "devops"
+          },
+          "label": {
+            "type": "string",
+            "example": "DevOps"
+          },
+          "icon": {
+            "type": "string",
+            "example": "⚙️"
+          },
+          "color": {
+            "type": "string",
+            "example": "#00B8D9"
+          }
         }
       },
       "Question": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer", "example": 1 },
-          "question_text": { "type": "string", "example": "What is the service container?" },
-          "category_id": { "type": "string", "example": "laravel-core" },
-          "category_label": { "type": "string", "description": "Denormalised from the join so the UI can label search results without a second request.", "example": "Laravel Core" },
-          "icon": { "type": "string", "example": "🔴" },
-          "color": { "type": "string", "example": "#FF4444" },
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "question_text": {
+            "type": "string",
+            "example": "What is the service container?"
+          },
+          "category_id": {
+            "type": "string",
+            "example": "laravel-core"
+          },
+          "category_label": {
+            "type": "string",
+            "description": "Denormalised from the join so the UI can label search results without a second request.",
+            "example": "Laravel Core"
+          },
+          "icon": {
+            "type": "string",
+            "example": "🔴"
+          },
+          "color": {
+            "type": "string",
+            "example": "#FF4444"
+          },
           "difficulty": {
             "type": "string",
             "description": "Difficulty rating. Defaults to `intermediate` when the field is omitted on create or update.",
-            "enum": ["beginner", "intermediate", "advanced"],
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ],
             "example": "intermediate"
           },
           "tags": {
             "type": "array",
             "description": "Free-form string tags. Stored as a JSON string and always returned as an array; malformed or absent values come back as `[]`.",
-            "items": { "type": "string" },
-            "example": ["architecture", "ioc"]
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "architecture",
+              "ioc"
+            ]
           }
         }
       },
       "QuestionWithAnswers": {
         "allOf": [
-          { "$ref": "#/components/schemas/Question" },
+          {
+            "$ref": "#/components/schemas/Question"
+          },
           {
             "type": "object",
             "properties": {
-              "answers": { "type": "array", "items": { "$ref": "#/components/schemas/Answer" } }
+              "answers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Answer"
+                }
+              }
             }
           }
         ]
@@ -615,112 +1018,237 @@
         "properties": {
           "items": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/QuestionWithAnswers" }
+            "items": {
+              "$ref": "#/components/schemas/QuestionWithAnswers"
+            }
           },
-          "total": { "type": "integer", "description": "Total number of matching questions, ignoring pagination.", "example": 61 },
-          "page": { "type": "integer", "description": "1-based page number that was served.", "example": 1 },
-          "limit": { "type": "integer", "description": "Page size that was served, after clamping to 1-100.", "example": 20 },
-          "pages": { "type": "integer", "description": "Number of pages available for `total` at this `limit`.", "example": 4 }
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching questions, ignoring pagination.",
+            "example": 61
+          },
+          "page": {
+            "type": "integer",
+            "description": "1-based page number that was served.",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Page size that was served, after clamping to 1-100.",
+            "example": 20
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Number of pages available for `total` at this `limit`.",
+            "example": 4
+          }
         }
       },
       "StatsResponse": {
         "type": "object",
         "properties": {
-          "total_categories": { "type": "integer", "example": 8 },
-          "total_questions": { "type": "integer", "example": 61 },
-          "total_answers": { "type": "integer", "example": 140 },
+          "total_categories": {
+            "type": "integer",
+            "example": 8
+          },
+          "total_questions": {
+            "type": "integer",
+            "example": 61
+          },
+          "total_answers": {
+            "type": "integer",
+            "example": 140
+          },
           "categories": {
             "type": "array",
             "description": "Every category with its `question_count`, ordered by label.",
-            "items": { "$ref": "#/components/schemas/Category" }
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
           }
         }
       },
       "QuestionInput": {
         "type": "object",
-        "required": ["category_id", "question_text"],
+        "required": [
+          "category_id",
+          "question_text"
+        ],
         "properties": {
-          "category_id": { "type": "string", "example": "laravel-core" },
-          "question_text": { "type": "string", "example": "Explain the service container." },
+          "category_id": {
+            "type": "string",
+            "example": "laravel-core"
+          },
+          "question_text": {
+            "type": "string",
+            "example": "Explain the service container."
+          },
           "answers": {
-            "description": "Optional. Accepts either an array of plain strings or an array of objects with an `answer_text` field.",
+            "description": "Zero or more answers. Non-empty strings after trimming; entries that are numbers, null, blank, or objects without `answer_text` are dropped rather than stringified.",
             "oneOf": [
-              { "type": "array", "items": { "type": "string" } },
-              { "type": "array", "items": { "$ref": "#/components/schemas/AnswerInput" } }
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnswerInput"
+                }
+              }
             ]
           },
           "difficulty": {
             "type": "string",
-            "description": "Defaults to `intermediate` when omitted.",
-            "enum": ["beginner", "intermediate", "advanced"],
+            "description": "One of the three levels. Defaults to `intermediate` when omitted, and any unrecognised value is stored as `intermediate` rather than verbatim, so the UI always has a label and colour for it.",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ],
             "example": "intermediate"
           },
           "tags": {
             "type": "array",
-            "description": "Array of strings, stored as a JSON string. Non-array values are stored as `[]`.",
-            "items": { "type": "string" },
-            "example": ["architecture"]
+            "description": "Array of strings, stored as a JSON string. Values are trimmed, lowercased, internal whitespace replaced with hyphens, de-duplicated, capped at 40 characters each and at 6 tags in total. Non-array values become an empty list.",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "architecture"
+            ]
           }
         }
       },
       "QuestionUpdateInput": {
         "type": "object",
-        "required": ["category_id", "question_text"],
+        "required": [
+          "category_id",
+          "question_text"
+        ],
         "properties": {
-          "question_text": { "type": "string" },
-          "category_id": { "type": "string" },
+          "question_text": {
+            "type": "string",
+            "description": "The question text, trimmed. Required on update, so this endpoint is a partial update of the other fields rather than a full replace."
+          },
+          "category_id": {
+            "type": "string",
+            "description": "Target category. Required on update because the form always submits it; the other optional fields may be omitted to keep their stored values."
+          },
           "answers": {
-            "description": "When present, replaces all existing answers for the question. Omit it to leave the existing answers untouched.",
+            "description": "When present, replaces all existing answers after dropping blank or non-text entries. Send an empty array to remove every answer. Omit the key to leave the existing answers untouched.",
             "oneOf": [
-              { "type": "array", "items": { "type": "string" } },
-              { "type": "array", "items": { "$ref": "#/components/schemas/AnswerInput" } }
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnswerInput"
+                }
+              }
             ]
           },
           "difficulty": {
             "type": "string",
-            "description": "Defaults to `intermediate` when omitted, so omitting it on an update overwrites a stored value.",
-            "enum": ["beginner", "intermediate", "advanced"]
+            "description": "One of the three levels. Omit the key to leave the stored level unchanged; an unrecognised value is stored as `intermediate`.",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
           },
           "tags": {
             "type": "array",
-            "description": "Array of strings, stored as a JSON string. Non-array values are stored as `[]`.",
-            "items": { "type": "string" }
+            "description": "Array of strings, trimmed, lowercased, whitespace replaced with hyphens, de-duplicated, capped at 40 characters each and at 6 tags in total. Omit the key to keep the stored tags; send an empty array to clear them.",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
       "AnswerInput": {
         "type": "object",
-        "required": ["answer_text"],
+        "required": [
+          "answer_text"
+        ],
         "properties": {
-          "answer_text": { "type": "string", "example": "The container binds class names to concrete instances." }
+          "answer_text": {
+            "type": "string",
+            "example": "The container binds class names to concrete instances."
+          }
         }
       },
       "Answer": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer", "example": 1 },
-          "question_id": { "type": "integer", "description": "Present on the direct answers route; omitted from the nested question payload.", "example": 1 },
-          "answer_text": { "type": "string", "description": "Rendered with preserved line breaks, so multi-line code examples keep their formatting.", "example": "First line.\nSecond line." }
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "question_id": {
+            "type": "integer",
+            "description": "Present on the direct answers route; omitted from the nested question payload.",
+            "example": 1
+          },
+          "answer_text": {
+            "type": "string",
+            "description": "Rendered with preserved line breaks, so multi-line code examples keep their formatting.",
+            "example": "First line.\nSecond line."
+          }
         }
       },
       "Message": {
         "type": "object",
-        "properties": { "message": { "type": "string", "example": "Question deleted successfully" } }
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Question deleted successfully"
+          }
+        }
       },
       "MessageWithId": {
         "type": "object",
         "properties": {
-          "id": { "oneOf": [{ "type": "integer" }, { "type": "string" }], "example": 62 },
-          "message": { "type": "string", "example": "Question added successfully" }
+          "id": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "example": 62
+          },
+          "message": {
+            "type": "string",
+            "example": "Question added successfully"
+          }
         }
       },
       "HealthResponse": {
         "type": "object",
-        "properties": { "status": { "type": "string", "example": "OK" } }
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "OK"
+          }
+        }
       },
       "Error": {
         "type": "object",
-        "properties": { "error": { "type": "string", "example": "Category not found" } }
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Category not found"
+          }
+        }
       }
     }
   }

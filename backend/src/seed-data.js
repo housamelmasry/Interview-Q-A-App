@@ -38,9 +38,20 @@ function normaliseDifficulty(raw) {
   return VALID_DIFFICULTIES.has(raw) ? raw : "intermediate";
 }
 
+const MAX_SEED_TAGS = 6;
+const MAX_SEED_TAG_LENGTH = 40;
+
 function normaliseTags(raw) {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((tag) => typeof tag === "string" && tag.trim().length > 0);
+  const seen = new Set();
+  for (const tag of raw) {
+    if (typeof tag !== "string") continue;
+    const cleaned = tag.trim().replace(/\s+/g, "-").toLowerCase();
+    if (!cleaned) continue;
+    seen.add(cleaned.slice(0, MAX_SEED_TAG_LENGTH));
+    if (seen.size >= MAX_SEED_TAGS) break;
+  }
+  return Array.from(seen);
 }
 
 async function seed() {

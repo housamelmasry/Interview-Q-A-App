@@ -1,6 +1,7 @@
 import type { Question } from "../api/types";
 import { DIFFICULTY_COLORS, DIFFICULTY_LABELS } from "../constants";
 import type { Theme } from "../theme";
+import { withAlpha } from "../theme";
 import { badgeStyle, ghostButtonStyle } from "./styles";
 
 interface QuestionCardProps {
@@ -118,7 +119,7 @@ export function QuestionCard({
             style={{
               ...badgeStyle(theme.mutedText),
               background: "transparent",
-              borderStyle: "dashed",
+              border: `1px dashed ${withAlpha(theme.mutedText, "44")}`,
             }}
           >
             #{tag}
@@ -129,7 +130,11 @@ export function QuestionCard({
       {isOpen && (
         <div style={{ padding: "0 1.25rem 1.25rem 1.25rem" }}>
           <div
-            style={{ height: "1px", background: `${question.color}22`, marginBottom: "1rem" }}
+            style={{
+              height: "1px",
+              background: withAlpha(question.color, "22"),
+              marginBottom: "1rem",
+            }}
           />
           {question.answers.map((answer, index) => (
             <div
@@ -140,7 +145,7 @@ export function QuestionCard({
                   index < question.answers.length - 1 ? "1rem" : 0,
                 position: "relative",
                 paddingRight: "1.5rem",
-                borderRight: `2px solid ${question.color}33`,
+                borderRight: `2px solid ${withAlpha(question.color, "33")}`,
               }}
             >
               <pre

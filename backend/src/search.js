@@ -164,7 +164,11 @@ export async function searchQuestions(db, term, { limit = 10, offset = 0 } = {})
   // Paginate on questions, then hydrate them. Applying LIMIT to the joined rows
   // instead would let a question's answer count consume the page budget.
   const idRows = await all(PAGE_IDS_SQL, [expression, expression, limit, offset]);
-  if (idRows.length === 0) return { items: [], total: 0 };
+
+  // A page past the end has no ids, but `total` still describes the result set.
+  // Reporting 0 here would make the client show "no results" and hide its
+  // pagination controls even though matching questions exist.
+  if (idRows.length === 0) return { items: [], total };
 
   const ids = idRows.map((r) => r.id);
   const rows = await all(hydrateSql(ids.length), ids);

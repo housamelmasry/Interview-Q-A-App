@@ -6,7 +6,7 @@ Every feature below is implemented in the code and covered by the test suites (5
 
 **Browse by category** — the 10 categories from `data.json` are bootstrapped on start and listed as horizontally scrollable tabs, each showing a live count of its questions. The count comes from `question_count`, which `GET /api/categories` computes with a `LEFT JOIN` and `COUNT(q.id)` on every request, so it reflects the current data rather than anything baked into the seed.
 
-Implemented in `frontend/src/components/CategoryTabs.tsx`; count computed in `backend/src/server.js`.
+Implemented in `frontend/src/components/CategoryTabs.tsx`; the count is computed in `backend/src/repository.js`.
 
 | Category            | `id`               | Icon | Questions |
 | ------------------- | ------------------ | ---- | --------- |
@@ -41,9 +41,9 @@ Pagination is applied to question **ids** before answers are joined in. Applying
 
 **Expand a question to read its answers** — clicking a question reveals all of its answers. Answers render inside a `<pre>` with `white-space: pre-wrap`, so multi-line and code-oriented content keeps its line breaks without needing a markdown parser. 46 of the 113 questions carry more than one answer; each is shown as a separate block, so alternative answers read as alternatives rather than as one run-on paragraph.
 
-**Difficulty badge** — every question has a `difficulty` of `beginner`, `intermediate` or `advanced`. It is stored as a column on `questions` and rendered as a coloured badge on each card. The three levels are defined once in `frontend/src/constants.ts` along with their labels and colours; the form's dropdown and the card's badge read from the same table, so they cannot drift. Bundled content is 21 beginner / 58 intermediate / 34 advanced. The API defaults the field to `intermediate` when it is omitted.
+**Difficulty badge** — every question has a `difficulty` of `beginner`, `intermediate` or `advanced`. It is stored as a column on `questions` and rendered as a coloured badge on each card. The three levels are defined once in `frontend/src/constants.ts` along with their labels and colours; the form's dropdown and the card's badge read from the same table, so they cannot drift. Bundled content is 21 beginner / 58 intermediate / 34 advanced. `POST` defaults the field to `intermediate` when it is omitted, and an unrecognised value is stored as `intermediate` rather than verbatim, so the badge always has a label and colour. `PUT` leaves the stored level alone when the key is omitted.
 
-**Tags** — every question also carries `tags`, stored as a JSON array in a `tags` column and typed as `string[]` on the client. They are English kebab-case, 2 to 3 per question in the bundled content, drawn from 124 distinct values such as `service-container`, `dependency-injection` and `caching`. Tags render as a `#tag` row under the question, beside the difficulty badge. A question with no tags renders the badge without any tag chips, which is the case the API's `[]` default produces. In the manage form, tags are typed as a comma-separated list and split on submit.
+**Tags** — every question also carries `tags`, stored as a JSON array in a `tags` column and typed as `string[]` on the client. They are English kebab-case, 2 to 3 per question in the bundled content, drawn from 124 distinct values such as `service-container`, `dependency-injection` and `caching`. Tags render as a `#tag` row under the question, beside the difficulty badge. A question with no tags renders the badge without any tag chips, which is what `POST` produces when the field is omitted. In the manage form, tags are typed as a comma-separated list and split on submit. The API trims, lowercases, converts internal whitespace to hyphens, de-duplicates and caps the list at 6 tags of 40 characters each, so what is stored matches what the seed file holds.
 
 **Search questions and answers** — see [Full-text search](#full-text-search) below. It is server-side, debounced, and paginated.
 

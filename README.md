@@ -42,6 +42,7 @@ It was built as a personal study tool and is documented to the standard expected
 
 - 15 routes over three resources, plus health, statistics and the OpenAPI document, described by an OpenAPI 3.0 specification and served through Swagger UI.
 - `GET /api/stats` returns site-wide totals with a per-category breakdown in one request.
+- `PUT /api/questions/:id` is a partial update: an omitted key keeps its stored value, so editing only the text cannot silently reset the difficulty or wipe the tags. Send an explicit `[]` to clear them.
 - Creates return `201` with the new id; updates and deletes return `200`; `400` / `404` / `500` carry a consistent `{ "error": "..." }` body.
 
 Full detail: [FEATURES.md](FEATURES.md). Design and data-model detail: [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -163,6 +164,7 @@ Multi-word queries are `AND`ed first, because "service container" should not mat
 │   │   ├── seed-data.js     # Replaces DB content with data.json
 │   │   ├── repository.js    # Parameterised SQL and transactions per operation
 │   │   ├── validate.js      # Shared difficulty / answers / tags normalisation
+│   │   ├── errors.js        # Centralised HTTP status and error message mapping
 │   │   ├── server.js        # Express app, 15 routes, Swagger UI
 │   │   └── db/
 │   │       ├── migrate.js   # Versioned migration runner
@@ -250,7 +252,8 @@ The backend suite drives the real exported Express app in-process with Supertest
 - transactional writes: a create against a non-existent category leaves the question count unchanged
 - cascade deletes at both levels
 - CRUD for all three resources, including `201` on create and `404` on a no-op update or delete
-- input normalisation: unknown `difficulty` values fall back to `intermediate`, tags are slugged and capped at 6, blank answers are dropped, and an update that omits `answers` keeps the stored ones
+- input normalisation: unknown `difficulty` values fall back to `intermediate`, tags are slugged and capped at 6, and blank answers are dropped
+- partial updates: omitting `answers`, `tags` or `difficulty` keeps the stored value, while an explicit `[]` clears tags or answers
 
 The frontend suite renders the real component tree in jsdom with `fetch` stubbed to an in-memory fake API that speaks the real paginated contract, and asserts through accessible queries (`getByRole`, `getByLabelText`) alongside `data-testid` hooks — so the tests double as accessibility checks. It covers initial load and error/retry, category navigation and the empty state, expanding questions, difficulty and tag rendering, debounced server-side search, out-of-order response cancellation, pagination controls, the theme toggle, and the manage-mode create/edit/delete flows. A separate `theme.test.ts` pins colour-tinting behaviour: tints are appended to 3-digit hex shorthands correctly, which is what keeps tag and category borders from silently disappearing in dark mode.
 

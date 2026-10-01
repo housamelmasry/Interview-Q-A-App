@@ -3,6 +3,7 @@ import type {
   AnswerInput,
   Category,
   CategoryInput,
+  Difficulty,
   MutationResult,
   PaginatedResponse,
   Question,
@@ -66,33 +67,42 @@ export interface ListParams {
 
 export interface QuestionListParams extends ListParams {
   category?: string;
+  difficulty?: Difficulty | null;
 }
 
 export interface SearchListParams extends ListParams {
   term: string;
+  difficulty?: Difficulty | null;
 }
 
-/** One page of questions, optionally narrowed to a single category. */
+/**
+ * One page of questions, narrowed by category and/or difficulty.
+ *
+ * `difficulty: null` is passed through as "no filter"; `buildUrl` drops empty
+ * values, so the parameter is simply omitted from the URL.
+ */
 export const fetchQuestions = ({
   category,
+  difficulty,
   page = 1,
   limit = PAGE_SIZE,
   signal,
 }: QuestionListParams = {}): Promise<PaginatedResponse<Question>> =>
   request<PaginatedResponse<Question>>(
-    buildUrl("/api/questions", { category, page, limit }),
+    buildUrl("/api/questions", { category, difficulty, page, limit }),
     { signal },
   );
 
 /** Full-text search over question and answer text, paginated the same way. */
 export const searchQuestions = ({
   term,
+  difficulty,
   page = 1,
   limit = PAGE_SIZE,
   signal,
 }: SearchListParams): Promise<PaginatedResponse<Question>> =>
   request<PaginatedResponse<Question>>(
-    buildUrl("/api/search", { q: term, page, limit }),
+    buildUrl("/api/search", { q: term, difficulty, page, limit }),
     { signal },
   );
 

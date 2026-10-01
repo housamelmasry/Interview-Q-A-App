@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchQuestions, searchQuestions } from "../api/client";
-import type { PaginatedResponse, Question } from "../api/types";
+import type { Difficulty, PaginatedResponse, Question } from "../api/types";
 import { PAGE_SIZE } from "../constants";
 import { describeError } from "./useResource";
 
@@ -9,6 +9,8 @@ export interface UseQuestionsParams {
   category: string;
   /** Already debounced by the caller. */
   searchTerm: string;
+  /** `null` means no difficulty filter. */
+  difficulty: Difficulty | null;
   page: number;
   limit?: number;
   /** Holds the request back while the active category is still unknown. */
@@ -35,12 +37,17 @@ const EMPTY_PAGE: PaginatedResponse<Question> = {
  *
  * A non-empty `searchTerm` switches the endpoint to `/api/search`, which spans
  * every category; otherwise the current `category` filter is applied server
- * side. The response envelope is exposed as-is so the pagination controls can
- * be driven by `total`/`pages` without a second request.
+ * side. `difficulty` narrows either endpoint and is orthogonal to `category`:
+ * during a search the category is ignored by the API, so the filter stays active
+ * across all categories rather than silently doing nothing.
+ *
+ * The response envelope is exposed as-is so the pagination controls can be driven
+ * by `total`/`pages` without a second request.
  */
 export function useQuestions({
   category,
   searchTerm,
+  difficulty,
   page,
   limit = PAGE_SIZE,
   enabled = true,
@@ -65,8 +72,8 @@ export function useQuestions({
     setError(null);
 
     const request = term
-      ? searchQuestions({ term, page, limit, signal: controller.signal })
-      : fetchQuestions({ category, page, limit, signal: controller.signal });
+      ? searchQuestions({ term, difficulty, page, limit, signal: controller.signal })
+      : fetchQuestions({ category, difficulty, page, limit, signal: controller.signal });
 
     request
       .then((response) => {
@@ -84,7 +91,7 @@ export function useQuestions({
       active = false;
       controller.abort();
     };
-  }, [category, term, page, limit, enabled, revision]);
+  }, [category, term, difficulty, page, limit, enabled, revision]);
 
   const reload = useCallback(() => setRevision((current) => current + 1), []);
   const clearError = useCallback(() => setError(null), []);

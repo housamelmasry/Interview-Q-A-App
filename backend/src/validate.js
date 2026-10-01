@@ -24,6 +24,20 @@ export function normaliseDifficulty(raw) {
 }
 
 /**
+ * Coerces a `difficulty` *query parameter* to one of the three levels, or null.
+ *
+ * This is deliberately different from `normaliseDifficulty`: that one answers
+ * "what should be stored", while this answers "is this a filter I understand". An
+ * unrecognised value becomes `null`, meaning no filter, rather than being
+ * coerced to `intermediate` — silently showing only intermediate questions
+ * because of a typo would be worse than ignoring the parameter. It matches how
+ * `parsePagination` treats junk input by falling back rather than erroring.
+ */
+export function parseDifficultyFilter(raw) {
+  return DIFFICULTIES.has(raw) ? raw : null;
+}
+
+/**
  * Normalises `answers` to a list of non-empty strings.
  *
  * Callers send either plain strings or objects carrying `answer_text`; anything

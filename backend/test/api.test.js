@@ -54,6 +54,22 @@ describe("GET /api/openapi.json", () => {
     assert.ok(res.body.paths["/api/questions"], "documents the questions route");
     assert.ok(res.body.paths["/api/categories/{id}"].put, "documents category update");
   });
+
+  // The difficulty filter is only usable if it is discoverable in the spec; the
+  // enum has to match the levels the implementation accepts or generated clients
+  // reject valid requests.
+  test("documents the difficulty filter on both list routes", async () => {
+    const res = await api.get("/api/openapi.json").expect(200);
+
+    for (const path of ["/api/questions", "/api/search"]) {
+      const params = res.body.paths[path].get.parameters;
+      const difficulty = params.find((p) => p.name === "difficulty");
+      assert.ok(difficulty, `${path} must document the difficulty parameter`);
+      assert.equal(difficulty.in, "query");
+      assert.equal(difficulty.required, false, `${path} difficulty must be optional`);
+      assert.deepEqual(difficulty.schema.enum, ["beginner", "intermediate", "advanced"]);
+    }
+  });
 });
 
 describe("migrations/indexes", () => {
@@ -526,6 +542,137 @@ describe("questions", () => {
     assert.ok(res.body.items.every((q) => q.category_id === "laravel-core"));
   });
 
+  // The test database starts with categories only, so these tests create the
+  // questions they need. Deriving expectations from whatever an earlier test
+  // happened to leave behind makes them order-dependent and easy to break.
+  describe("difficulty filter", () => {
+    // A dedicated category keeps this suite's questions from colliding with the
+    // ones other tests create, so the totals below are deterministic.
+    const CATEGORY = "testing";
+
+    let counts = null;
+
+    before(async () => {
+      // 6 beginner / 5 intermediate / 4 advanced in `testing`, plus 2 beginner in
+      // another category so the category and difficulty filters can be shown to
+      // be independent axes.
+      const plan = [
+        [CATEGORY, "beginner", 6],
+        [CATEGORY, "intermediate", 5],
+        [CATEGORY, "advanced", 4],
+        ["nodejs", "beginner", 2],
+      ];
+
+      for (const [category_id, difficulty, n] of plan) {
+        for (let i = 0; i < n; i += 1) {
+          await api
+            .post("/api/questions")
+            .send({
+              category_id,
+              question_text: `filter fixture ${category_id} ${difficulty} ${i}`,
+              answers: ["fixture answer"],
+              difficulty,
+            })
+            .expect(201);
+        }
+      }
+
+      // Totals are read back from the API rather than assumed from `plan`, so a
+      // question created by an earlier test cannot quietly invalidate them.
+      const countFor = async (query) =>
+        (await api.get(`/api/questions?${query}&limit=100`).expect(200)).body.total;
+      counts = {
+        beginner: await countFor("category=testing&difficulty=beginner"),
+        intermediate: await countFor("category=testing&difficulty=intermediate"),
+        advanced: await countFor("category=testing&difficulty=advanced"),
+        testingAll: await countFor("category=testing"),
+      };
+    });
+
+    test("returns only questions at the requested difficulty", async () => {
+      for (const difficulty of ["beginner", "intermediate", "advanced"]) {
+        const res = await api
+          .get(`/api/questions?category=${CATEGORY}&difficulty=${difficulty}&limit=100`)
+          .expect(200);
+
+        assert.equal(res.body.total, counts[difficulty], `${difficulty} total`);
+        assert.ok(
+          res.body.items.every(
+            (q) => q.difficulty === difficulty && q.category_id === CATEGORY,
+          ),
+          `every item must be ${difficulty} in ${CATEGORY}`,
+        );
+      }
+    });
+
+    test("combines the category and difficulty filters", async () => {
+      const res = await api.get("/api/questions?category=nodejs&difficulty=beginner").expect(200);
+      assert.ok(res.body.items.length > 0);
+      assert.ok(
+        res.body.items.every((q) => q.category_id === "nodejs" && q.difficulty === "beginner"),
+      );
+      // The two filters are independent axes, not one replacing the other.
+      assert.equal(res.body.total, 2);
+    });
+
+    test("the three levels partition a category exactly", async () => {
+      const sum = counts.beginner + counts.intermediate + counts.advanced;
+      assert.equal(sum, counts.testingAll);
+    });
+
+    test("an unknown difficulty filter is ignored rather than coerced", async () => {
+      // Coercing "expert" to `intermediate` would silently show only intermediate
+      // questions because of a typo, which is worse than ignoring the parameter.
+      const unfiltered = await api.get(`/api/questions?category=${CATEGORY}&limit=100`).expect(200);
+      const junk = await api
+        .get(`/api/questions?category=${CATEGORY}&difficulty=expert&limit=100`)
+        .expect(200);
+
+      assert.equal(junk.body.total, unfiltered.body.total);
+      assert.deepEqual(junk.body.items, unfiltered.body.items);
+    });
+
+    test("an empty match returns an empty envelope, not an error", async () => {
+      // `sre-tools` is not a category, so nothing can match it.
+      const res = await api.get("/api/questions?category=sre-tools&difficulty=advanced").expect(200);
+      assert.deepEqual(res.body.items, []);
+      assert.equal(res.body.total, 0);
+      assert.equal(res.body.pages, 1);
+    });
+
+    test("keeps total and pagination consistent under a filter", async () => {
+      const limit = 4;
+      const pages = Math.ceil(counts.beginner / limit);
+
+      const seen = new Set();
+      for (let page = 1; page <= pages; page += 1) {
+        const res = await api
+          .get(`/api/questions?category=${CATEGORY}&difficulty=beginner&limit=${limit}&page=${page}`)
+          .expect(200);
+
+        assert.equal(res.body.total, counts.beginner, `page ${page} total`);
+        assert.equal(res.body.pages, pages, `page ${page} page count`);
+        assert.ok(
+          res.body.items.every((q) => q.difficulty === "beginner"),
+          "the filter must hold on every page",
+        );
+        for (const item of res.body.items) {
+          assert.ok(!seen.has(item.id), `page ${page} repeated question ${item.id}`);
+          seen.add(item.id);
+        }
+      }
+      assert.equal(seen.size, counts.beginner, "paging must reach every match exactly once");
+    });
+
+    test("a page past the end still reports the real total", async () => {
+      const res = await api
+        .get(`/api/questions?category=${CATEGORY}&difficulty=beginner&limit=4&page=99`)
+        .expect(200);
+      assert.deepEqual(res.body.items, []);
+      assert.equal(res.body.total, counts.beginner);
+    });
+  });
+
   test("returns an empty envelope for a category with no questions", async () => {
     const res = await api.get("/api/questions?category=sre-tools").expect(200);
     assert.deepEqual(res.body.items, []);
@@ -725,6 +872,79 @@ describe("search", () => {
     const res = await api.get("/api/search?q=").expect(200);
     assert.deepEqual(res.body.items, []);
     assert.equal(res.body.total, 0);
+  });
+
+  // Regression: the difficulty predicate used to be appended to the end of the
+  // page query, which already ended in `ORDER BY ...`, producing
+  // "near WHERE: syntax error" and a 500. The count query has no ORDER BY, so
+  // the bug only showed on the query that actually returned items.
+  test("filters search results by difficulty without a SQL error", async () => {
+    for (const difficulty of ["beginner", "intermediate", "advanced"]) {
+      const res = await api
+        .get(`/api/search?q=container&difficulty=${difficulty}`)
+        .expect(200);
+      assert.ok(
+        res.body.items.every((q) => q.difficulty === difficulty),
+        `every ${difficulty} hit must be ${difficulty}`,
+      );
+    }
+  });
+
+  test("the difficulty filter accounts for every search hit", async () => {
+    // If the filter were applied to the count but not the page (or the reverse),
+    // the three levels would not add up to the unfiltered total.
+    const unfiltered = await api.get("/api/search?q=container&limit=100").expect(200);
+    let sum = 0;
+    for (const difficulty of ["beginner", "intermediate", "advanced"]) {
+      const res = await api
+        .get(`/api/search?q=container&difficulty=${difficulty}&limit=100`)
+        .expect(200);
+      sum += res.body.total;
+    }
+    assert.equal(sum, unfiltered.body.total);
+  });
+
+  test("keeps total stable across pages under a difficulty filter", async () => {
+    const res = await api
+      .get("/api/search?q=service&difficulty=intermediate&limit=2&page=1")
+      .expect(200);
+    const past = await api
+      .get("/api/search?q=service&difficulty=intermediate&limit=2&page=99")
+      .expect(200);
+
+    assert.deepEqual(past.body.items, []);
+    assert.equal(
+      past.body.total,
+      res.body.total,
+      "a page past the end must still report the real total",
+    );
+  });
+
+  test("the AND-to-OR fallback still applies the difficulty filter", async () => {
+    // "ال container" ANDs to nothing, so it falls back to OR. The filter has to
+    // survive that retry, which means both attempts have to bind it. These
+    // fixtures are created without a difficulty, so they are all `intermediate`.
+    const hit = await api
+      .get("/api/search?q=%D8%A7%D9%84%20container&difficulty=intermediate")
+      .expect(200);
+    assert.ok(hit.body.total > 0, "the OR fallback should still find something");
+    assert.ok(hit.body.items.every((q) => q.difficulty === "intermediate"));
+
+    // Proof the filter was part of the retry rather than dropped from it: the
+    // same query filtered to a level with no hits must come back empty, not with
+    // the unfiltered hits.
+    const miss = await api
+      .get("/api/search?q=%D8%A7%D9%84%20container&difficulty=advanced")
+      .expect(200);
+    assert.equal(miss.body.total, 0);
+  });
+
+  test("ignores an unknown difficulty on search rather than filtering", async () => {
+    const unfiltered = await api.get("/api/search?q=container&limit=100").expect(200);
+    const junk = await api
+      .get("/api/search?q=container&difficulty=expert&limit=100")
+      .expect(200);
+    assert.equal(junk.body.total, unfiltered.body.total);
   });
 
   test("whitespace-only q returns an empty envelope", async () => {

@@ -317,7 +317,15 @@ Applying `LIMIT`/`OFFSET` to *that* query is the classic pagination bug: the lim
 
 Both endpoints therefore page the **question ids** first and hydrate exactly those ids in a second statement. `hydrateSql(count)` builds its placeholder list from the actual id count rather than padding to a fixed width, so a one-row page sends one `?`. `groupRows` then collapses the flat rows back into the nested shape using a `Map`, so the client still gets one object per question with an `answers` array.
 
-The same pattern is applied to `GET /api/questions` (`server.js:187-196`), and `backend/test/api.test.js:538-570` is the regression test: three questions with three, two and one answers, page size 2, asserting the first page holds two questions, the second holds one, `total` is 3, and the pages do not overlap.
+The same pattern is applied to `GET /api/questions` (`server.js:189-201`), and `backend/test/api.test.js:684-715` is the regression test: three questions with three, two and one answers, page size 2, asserting the first page holds two questions, the second holds one, `total` is 3, and the pages do not overlap.
+
+### Filters and the count/page invariant
+
+`listQuestions` collects predicates into a list and joins them, rather than hard-coding one filter per query. That is what keeps the count and the id page derived from the same fragment, so `total` cannot drift from the items returned as filters are added. `difficulty` is the second predicate and is combined with `category` with `AND`.
+
+`difficulty` is validated once, at the edge, by `parseDifficultyFilter` in `validate.js`: a recognised level is returned, and anything else becomes `null`, which means no filter. Coercing an unknown value to a level would be actively harmful — `?difficulty=expert` would silently show only intermediate questions — so the parameter is ignored and the unfiltered list comes back. This mirrors how `parsePagination` treats junk input: fall back rather than error, and never invent a filter the caller did not ask for.
+
+Search applies the same predicate to both statements, and the predicate has to be spliced in *before* `ORDER BY`, which is why `totalSql` and `pageIdsSql` in `search.js` are functions taking the fragment rather than template strings. A count that ignored the filter would overstate `total`; a page that ignored it would list items the count does not account for. Either way the pagination controls describe a set the user is not looking at.
 
 ## API surface
 
@@ -334,12 +342,12 @@ POST   /api/categories
 PUT    /api/categories/:id
 DELETE /api/categories/:id
 
-GET    /api/questions[?category=<id>&page=&limit=]
+GET    /api/questions[?category=<id>&difficulty=&page=&limit=]
 POST   /api/questions
 PUT    /api/questions/:id
 DELETE /api/questions/:id
 
-GET    /api/search?q=<term>&page=&limit=
+GET    /api/search?q=<term>&difficulty=&page=&limit=
 
 GET    /api/answers/:questionId
 PUT    /api/answers/:id
@@ -387,10 +395,10 @@ hooks/useResource   generic load / error / reload primitive
   ├── useStats       GET /api/stats
   └── useQuestions   GET /api/questions or GET /api/search, paginated
 hooks/useDebounce   generic value + delay
-components/*        presentational only (14): Header, StatsBar, SearchBar,
-                    CategoryTabs, QuestionList, QuestionCard, QuestionForm,
-                    CategoryForm, Modal, Pagination, ErrorBanner, Footer,
-                    LoadingScreen, ManageToolbar
+components/*        presentational only (15): Header, StatsBar, SearchBar,
+                    DifficultyFilter, CategoryTabs, QuestionList, QuestionCard,
+                    QuestionForm, CategoryForm, Modal, Pagination, ErrorBanner,
+                    Footer, LoadingScreen, ManageToolbar
 ```
 
 The rule is that components receive data and callbacks as props and own no fetching. State that is derived — the active category when the selected one has been deleted, the theme object — is computed with `useMemo` during render rather than stored, so it cannot drift.
@@ -400,9 +408,11 @@ The rule is that components receive data and callbacks as props and own no fetch
 ```ts
 const term = searchTerm.trim();
 const request = term
-  ? searchQuestions({ term, page, limit, signal: controller.signal })
-  : fetchQuestions({ category, page, limit, signal: controller.signal });
+  ? searchQuestions({ term, difficulty, page, limit, signal: controller.signal })
+  : fetchQuestions({ category, difficulty, page, limit, signal: controller.signal });
 ```
+
+`difficulty` is forwarded to both endpoints and is listed in the effect's dependency array, so changing it re-requests. It is deliberately *not* dropped during a search: the search endpoint ignores `category` and spans every category, so dropping the difficulty filter there would make it silently stop applying while the control still looked active.
 
 Each render's effect creates a fresh `AbortController` and returns a cleanup that sets a local `active` flag to `false` and calls `controller.abort()`. This closes a real race: a fast typist produces overlapping requests, and without cancellation the slow first response can resolve *after* the fast second one and overwrite the newer results with stale ones. Two independent guards prevent that — the aborted `fetch` rejects, and even if a response were already in flight the `active` check means it is never committed. The tests pin this (`aborts a stale request and keeps the newest results`) by holding one response open, issuing a newer query, and asserting the first request's `signal.aborted` is `true` and that the late response does not change the rendered state.
 
@@ -410,7 +420,7 @@ Each render's effect creates a fresh `AbortController` and returns a cleanup tha
 
 ## Testing and CI
 
-**Backend — 59 tests, 8 suites** (`node:test` + Supertest) drive the real exported Express app in-process against a temporary SQLite file. No mocked database: real SQL, real migrations, real transactions, real cascades. Isolation comes from `DB_PATH`, set before the app is imported; the temp directory is removed afterwards. Coverage worth naming:
+**Backend — 72 tests, 9 suites** (`node:test` + Supertest) drive the real exported Express app in-process against a temporary SQLite file. No mocked database: real SQL, real migrations, real transactions, real cascades. Isolation comes from `DB_PATH`, set before the app is imported; the temp directory is removed afterwards. Coverage worth naming:
 
 | Area | What is asserted |
 | --- | --- |
@@ -419,19 +429,25 @@ Each render's effect creates a fresh `AbortController` and returns a cleanup tha
 | Query plans | `EXPLAIN QUERY PLAN` uses an index for `category_id` and for `question_id`, and does not fall back to a scan |
 | Pagination | envelope fields, page splitting, clamping (`limit=9999` → 100, `limit=0` → 1), non-numeric input, no overlap between pages |
 | Search | Arabic terms, prefix match, answer-only match, AND-then-OR fallback, nested hydration shape, FTS operator sanitization |
+| Difficulty filter | one level at a time; category and difficulty combined; the three levels partition a category exactly; `total` and `pages` stay consistent across every page; a page past the end still reports the real total; the filter survives the AND-then-OR retry |
+| Unknown filter values | `?difficulty=expert` returns the unfiltered list rather than being coerced to a level |
 | Transactions | a create whose category does not exist leaves the question count unchanged |
 | Cascades | deleting a category removes its questions and their answers; deleting a question removes its answers |
 | CRUD | full lifecycle per resource, `201` on create, `404` on no-op update/delete, `400` on missing fields |
 | Input normalisation | unknown `difficulty` falls back to `intermediate`; tags are trimmed, slugged, de-duplicated and capped at 6; blank answers are dropped |
 | Partial updates | omitting `answers`, `tags` or `difficulty` keeps the stored value, while an explicit `[]` clears tags or answers |
 
-**Frontend — 52 tests** across three files (Vitest + jsdom, Testing Library). 42 of them live in `App.test.tsx`, which renders the real `App` with `fetch` stubbed to deterministic fixtures and asserts through `getByRole`, `getByLabelText` and `getByTestId`, so the suite doubles as an accessibility check. Four cover `useDebounce` directly via `renderHook`, and six cover `withAlpha` in `theme.test.ts`. `cleanup` and mock restoration run in `src/test/setup.ts` after every test.
+**Frontend — 63 tests** across three files (Vitest + jsdom, Testing Library). 53 of them live in `App.test.tsx`, which renders the real `App` with `fetch` stubbed to deterministic fixtures and asserts through `getByRole`, `getByLabelText` and `getByTestId`, so the suite doubles as an accessibility check. Four cover `useDebounce` directly via `renderHook`, and six cover `withAlpha` in `theme.test.ts`. `cleanup` and mock restoration run in `src/test/setup.ts` after every test.
 
 **Two frontend regressions worth naming, because both were invisible in the browser output.**
 
 *The tag pill had no border in dark mode.* Components tinted a colour by appending alpha digits to the hex string (`` `${theme.mutedText}44` ``). That is only safe for 6-digit hex. The dark muted colour is the 3-digit shorthand `#666`, so the concatenation produced `#66644` — five hex digits, an invalid colour. Browsers and jsdom both discard an invalid colour, and because it was the only value in the `border` shorthand, the entire declaration vanished and the pill rendered with no border at all. `withAlpha` in `theme.ts` now expands 3-digit shorthand to 6 digits before appending, so the result is always a valid 8-digit `#rrggbbaa`, and passes non-hex values such as `transparent` and `rgb(...)` through untouched. `theme.test.ts` asserts that every theme field in both modes stays a valid hex colour, which is the check that would have caught it.
 
 *The same pill also mixed CSS shorthand and longhand.* It spread `badgeStyle` — which sets the `border` shorthand — and then overrode only `borderStyle`. React warns whenever a style update mixes the two, and the surviving declaration depends on property order. Writing the whole border in one shorthand removed the warning. The assertion reads the serialised `style` attribute rather than `el.style`, because jsdom normalises an 8-digit hex to `rgba()`, and a `border` shorthand containing a dropped colour is exactly the failure being guarded against.
+
+*`WHERE` cannot be appended to a query that already ends in `ORDER BY`.* The difficulty filter is spliced into the search SQL, and the first version appended the predicate to the end of both statements. The count query has no `ORDER BY`, so it worked; the page query does, so `?difficulty=` returned `500 SQLITE_ERROR: near "WHERE": syntax error` on every filtered search. Only a filter combined with a search exposed it, since browsing never touches that query. `totalSql` and `pageIdsSql` are now functions that place the predicate before the `ORDER BY`, and `backend/test/api.test.js` filters a search by each of the three levels, which fails loudly if the clause lands in the wrong place again.
+
+*The same reasoning applies to the count.* Filtering the page but not the count undercounts `total`; filtering the count but not the page lists items the total does not account for. Both directions make the pagination controls lie. The tests assert that the three difficulty totals sum to the unfiltered total, which only holds if the page and the count are filtered identically.
 
 **A testing gotcha worth recording.** `userEvent` deadlocks under Vitest fake timers: Testing Library's async wrapper awaits its own work, and that only advances Jest's clock, so the awaited interaction never resolves. Debounce behaviour is therefore tested by driving a `fireEvent.change` burst (`"e"`, `"ev"`, `"event loop"`) and asserting at the debounce boundary — no request at `DEBOUNCE_MS - 1`, exactly one request for the final value after `+1`. `userEvent` is still used everywhere real timers are in play.
 

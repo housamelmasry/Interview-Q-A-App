@@ -11,7 +11,7 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/db/migrations/002-question-metadata.js`, `backend/src/db/migrations/001-initial-schema.js`, `backend/src/seed-data.js:21-44`
 
 **Referential integrity** — `PRAGMA foreign_keys = ON` on every connection (SQLite defaults this off, which silently disables cascades) plus `ON DELETE CASCADE` on both foreign keys, so dependent rows cannot be orphaned. Asserted by tests rather than assumed: deleting a category removes its questions and their answers.
-`backend/src/database.js:25-30`, `backend/src/db/migrations/001-initial-schema.js`, `backend/test/api.test.js:886-906`
+`backend/src/database.js:25-30`, `backend/src/db/migrations/001-initial-schema.js`, `backend/test/api.test.js:1104-1126`
 
 ## Versioned migrations
 
@@ -59,13 +59,13 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/search.js:45-77`
 
 **Arabic tokenization** — `tokenize = 'unicode61 remove_diacritics 2'`. `unicode61` classifies letters and digits by Unicode category, so Arabic letters are token characters and Arabic is indexed and matched with no custom tokenizer. `remove_diacritics 2` folds Latin accents (`café` matches `cafe`); it does not fold Arabic tashkeel or tatweel, so matching stays token-level with no stemming.
-`backend/src/db/migrations/004-full-text-search.js:16-22`, `backend/test/api.test.js:477-482`
+`backend/src/db/migrations/004-full-text-search.js:16-22`, `backend/test/api.test.js:479-488`
 
 **Search-input sanitization treated as a security property** — FTS5 treats `"`, `*`, `^`, `NEAR`, `OR` and parentheses as syntax, so raw user input to `MATCH` yields `500`s and lets a term smuggle in operators. `buildMatchQuery` strips everything that is not a letter or digit, caps at 8 tokens, wraps each in double quotes so it becomes an inert string literal, and appends `*` to the last token only for prefix search. A table of FTS5 operators (`"`, `NEAR`, `*`, `container^`, `a OR`, `(((`) is run through the endpoint in tests, plus an assertion that an injection attempt does not return the whole corpus.
-`backend/src/search.js:12-36`, `backend/test/api.test.js:645-666`
+`backend/src/search.js:12-36`, `backend/test/api.test.js:949-971`
 
 **A domain-specific fallback, not a generic one** — multi-word queries are ANDed, but Arabic writes the definite article attached to the word, so "ال container" contains a token that matches nothing in the corpus and the AND attempt returns zero. An empty AND result is retried with `OR`. The fallback only fires on an empty result set, so the extra round trip is paid only in the rare case.
-`backend/src/search.js:148-168`, `backend/test/api.test.js:613-634`
+`backend/src/search.js:148-168`, `backend/test/api.test.js:922-939`
 
 **Prefix search for an as-you-type box** — only the final token gets the `*` suffix, so results narrow as the user types instead of every token becoming a prefix match.
 `backend/src/search.js:33-36`
@@ -82,7 +82,7 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/src/server.js:138-185`, `backend/src/server.js:248-255`, `backend/src/repository.js:189-217`
 
 **Falsy parameter parsing handled explicitly** — `Number.parseInt` returns `NaN` rather than `undefined` for junk input, so the code tests `Number.isFinite` before clamping. `?limit=abc&page=xyz` yields the defaults; `?limit=0&page=0` yields `limit=1, page=1`.
-`backend/src/server.js:58-66`, `backend/test/api.test.js:571-600`
+`backend/src/server.js:58-66`, `backend/test/api.test.js:744-781`
 
 **Denormalised read payloads** — category `label`, `icon` and `color` are selected alongside each question so a search result can be labelled without a second lookup.
 `backend/src/search.js:84-93`
@@ -104,8 +104,10 @@ A map of the engineering skills this project exercises, with the file and line w
 **Replace-not-patch semantics for a child collection** — a supplied `answers` array is the complete desired set, deleted and reinserted inside one transaction; omitting the array leaves answers untouched. Simpler and safer than diffing, and the reason the individual answer endpoints are unused by the UI.
 
 **Consistent partial-update semantics across every optional field** — omitting `tags` or `difficulty` keeps the stored value, because `updateQuestion` builds its `SET` clause from the keys actually present rather than defaulting them. Applying this only to `answers` was a genuine bug: a text-only edit reset the difficulty to `intermediate` and blanked the tags. The regression test asserts both directions, that omitting keeps and an explicit `[]` clears.
-`backend/src/repository.js:189-217`, `backend/src/server.js:164-185`, `backend/test/api.test.js:388-429`
-`backend/src/repository.js:189-217`, `backend/test/api.test.js:344-379`
+`backend/src/repository.js:189-217`, `backend/src/server.js:164-185`, `backend/test/api.test.js:404-455`
+`backend/src/repository.js:189-217`, `backend/test/api.test.js:360-397`
+
+**Filters assembled from a shared fragment** — `listQuestions` collects predicates into a list and joins them, and the count query is derived from the same `WHERE` as the id page. Hard-coding one filter per statement would let the two drift as soon as a second filter appeared, which is how `total` starts disagreeing with the items on screen.
 
 **SQL injection defence** — every query in the project uses `?` placeholders. No user input is concatenated into SQL anywhere, including the id lists in the two hydrate queries, which are generated from placeholder marks.
 `backend/src/server.js`, `backend/src/search.js`, `backend/src/db/migrations/`
@@ -115,7 +117,7 @@ A map of the engineering skills this project exercises, with the file and line w
 
 ## Frontend
 
-**Component decomposition of a monolith** — `App.tsx` went from ~781 lines to 334 and is now a composition root holding view state and wiring, with data fetching in hooks and rendering in fourteen presentational components under `components/`, none of which fetch anything.
+**Component decomposition of a monolith** — `App.tsx` went from ~781 lines to 359 and is now a composition root holding view state and wiring, with data fetching in hooks and rendering in fifteen presentational components under `components/`, none of which fetch anything.
 `frontend/src/App.tsx`, `frontend/src/components/`
 
 **Layered data flow** — `api/types.ts` (wire types) → `api/client.ts` (typed fetch) → `hooks/useResource` (generic load/error/reload primitive) → domain hooks (`useQuestions`, `useCategories`, `useStats`) → components. `useCategories` and `useStats` are a handful of lines each because they are `useResource` pointed at a different endpoint.
@@ -148,19 +150,27 @@ A map of the engineering skills this project exercises, with the file and line w
 **Immutable array updates** — adding, editing and removing an answer builds a new array and replaces state, so React's change detection stays correct.
 `frontend/src/components/QuestionForm.tsx`
 
-**Accessibility as part of the design** — form controls are associated with labels via `htmlFor`/`id`, the error banner uses `role="alert"`, interactive elements are real `<button>`s, the answer toggle carries `aria-expanded`, the active tab carries `aria-pressed`, and every icon-only control (dismiss, edit, delete, remove answer) has an `aria-label`. RTL is designed in, not mirrored: `dir="rtl"` at the document level, and pagination places "previous" on the right where it belongs in reading order.
-`frontend/src/components/ErrorBanner.tsx:13-49`, `frontend/src/components/CategoryTabs.tsx:47-82`, `frontend/src/components/QuestionCard.tsx:47`, `frontend/src/components/Pagination.tsx:41-65`, `frontend/index.html:2`
+**A filter that stays honest in the UI** — the difficulty control is one `null`-able value with an explicit "الكل" option, and clicking the active level clears it, so there is no separate reset button to find. It forwards to both endpoints rather than only to browse, because `/api/search` ignores the category and a filter that were dropped there would look active while doing nothing. Changing it resets to page 1, since a page number carried over from a larger result set points past the end.
+
+**Accessibility as part of the design** — form controls are associated with labels via `htmlFor`/`id`, the error banner uses `role="alert"`, interactive elements are real `<button>`s, the answer toggle carries `aria-expanded`, the active tab and the active difficulty level both carry `aria-pressed`, and every icon-only control (dismiss, edit, delete, remove answer) has an `aria-label`. RTL is designed in, not mirrored: `dir="rtl"` at the document level, and pagination places "previous" on the right where it belongs in reading order.
+`frontend/src/components/ErrorBanner.tsx:13-49`, `frontend/src/components/CategoryTabs.tsx:47-82`, `frontend/src/components/DifficultyFilter.tsx:35-73`, `frontend/src/components/QuestionCard.tsx:47`, `frontend/src/components/Pagination.tsx:41-65`, `frontend/index.html:2`
 
 **Centralised configuration** — the API base URL is read once from `VITE_API_URL` at module scope and page size and debounce interval live in `constants.ts`, so no magic numbers are scattered through components.
 `frontend/src/api/client.ts:13`, `frontend/src/constants.ts`
 
 ## Testing
 
-**API integration tests** — 59 tests across 8 suites using the built-in `node:test` runner and Supertest. They exercise the real app, real SQL, real migrations, real transactions and real cascades against a temporary database, not mocks.
+**API integration tests** — 72 tests across 9 suites using the built-in `node:test` runner and Supertest. They exercise the real app, real SQL, real migrations, real transactions and real cascades against a temporary database, not mocks.
 `backend/test/api.test.js`
 
 **Asserting on query plans, not just results** — a test can pass while the data layer silently degrades to a full scan. The suite checks `sqlite_master` for the three index names and then checks `EXPLAIN QUERY PLAN` output for both foreign-key predicates, so a dropped index or a planner regression fails the build.
 `backend/test/api.test.js:76-127`
+
+**The count/page invariant pinned from both directions** — a difficulty filter that reaches the page query but not the count undercounts `total`; one that reaches the count but not the page lists items `total` does not account for. Both make the pagination controls describe a set the user is not looking at, and neither shows up in a result-only assertion, so the suite asserts the three levels sum to the unfiltered total and that `total`/`pages` are unchanged on every page.
+
+**A SQL composition bug caught only by combining two features** — the difficulty predicate was first appended to the end of both search statements. The count query has no `ORDER BY`, so it worked; the page query does, so every filtered search returned `500 SQLITE_ERROR: near "WHERE"`. Browsing never touches that query, so only search plus filter exposed it. The predicate now goes through `totalSql`/`pageIdsSql`, which place it before `ORDER BY`, and a test filters a search by each level.
+
+**Unknown filter values are ignored, never coerced** — `?difficulty=expert` returns the unfiltered list. Falling back to a level would silently show only intermediate questions because of a typo, which is a worse failure than the filter doing nothing, so an unrecognised value becomes `null` and no predicate is added.
 
 **Contract tests for status codes and envelopes** — `201` on create, `400` on missing required fields, `404` on no-op update and delete, pagination clamping, and the full envelope shape on empty results as well as populated ones.
 `backend/test/api.test.js`
@@ -169,12 +179,12 @@ A map of the engineering skills this project exercises, with the file and line w
 `backend/test/api.test.js:579-600`
 
 **The Arabic OR fallback pinned by a test** — the AND result is asserted to exclude questions matching only one token, and the "ال container" retry is asserted to recover the Arabic match, so both halves of the fallback are protected.
-`backend/test/api.test.js:548-565`
+`backend/test/api.test.js:922-939`
 
 **Regression tests as documentation** — the missing `PUT /api/categories/:id` route is pinned by a test named for the bug it prevents, and the page-size-by-question behaviour is pinned by a test that seeds three questions with three, two and one answers.
-`backend/test/api.test.js:177`, `backend/test/api.test.js:351-382`
+`backend/test/api.test.js:177`, `backend/test/api.test.js:684-715`
 
-**Component tests with accessible queries** — 41 tests render the real `App` in jsdom and assert through `getByRole`, `getByLabelText` and `getByTestId`, the same queries assistive technology uses, so the suite doubles as an accessibility check. A further 4 cover `useDebounce` through `renderHook`, making 45 in total. The label/input association bug found while writing them was a real defect, not a test artefact.
+**Component tests with accessible queries** — 53 tests render the real `App` in jsdom and assert through `getByRole`, `getByLabelText` and `getByTestId`, the same queries assistive technology uses, so the suite doubles as an accessibility check. A further 4 cover `useDebounce` through `renderHook`, making 57, plus 6 for `withAlpha`. The label/input association bug found while writing them was a real defect, not a test artefact.
 `frontend/src/App.test.tsx`, `frontend/src/hooks/useDebounce.test.ts`
 
 **A testing gotcha documented rather than worked around quietly** — `userEvent` deadlocks under Vitest fake timers, because Testing Library's async wrapper only advances Jest's clock and the awaited interaction never resolves. Debounce behaviour is therefore tested by driving a `fireEvent.change` burst and asserting at the debounce boundary: nothing at `DEBOUNCE_MS - 1`, exactly one request for the final value after `+1`. `userEvent` is still used everywhere real timers are in play. Timer state is reset in `afterEach` so a fake-timer test cannot stall the next one.

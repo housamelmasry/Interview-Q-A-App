@@ -65,16 +65,38 @@ const HITS_CTE = `
   )
 `;
 
-const TOTAL_SQL = `${HITS_CTE} SELECT COUNT(*) AS count FROM hits`;
+/**
+ * The count and the page are built from the same fragments, with the filter
+ * spliced in before `ORDER BY`.
+ *
+ * These are functions rather than constants because a `WHERE` clause cannot be
+ * appended to the end of the page query, which already ends in `ORDER BY`.
+ */
+const totalSql = (filter) => `${HITS_CTE}
+  SELECT COUNT(*) AS count
+    FROM hits
+    JOIN questions q ON q.id = hits.id
+   ${filter}
+`;
 
 /** The page of question ids, so LIMIT counts questions rather than answer rows. */
-const PAGE_IDS_SQL = `${HITS_CTE}
+const pageIdsSql = (filter) => `${HITS_CTE}
   SELECT q.id
     FROM hits
     JOIN questions q ON q.id = hits.id
+   ${filter}
    ORDER BY hits.source, hits.rank, q.id
    LIMIT ? OFFSET ?
 `;
+
+/**
+ * The difficulty predicate, or an empty string when there is no filter.
+ *
+ * Both the count and the page query filter on the same column, so `total` always
+ * describes exactly the set the page is drawn from.
+ */
+const difficultyFilter = (difficulty) =>
+  difficulty ? "WHERE q.difficulty = ?" : "";
 
 /**
  * Hydrates a page of question ids with their category metadata and answers.
@@ -143,19 +165,36 @@ const wrap = (fn) =>
  * leading definite article in a query ("ال") has no matching token in the corpus,
  * which would otherwise make "ال container" return nothing, so an empty AND
  * result is retried with OR before giving up.
+ *
+ * `difficulty` is an optional exact-match filter on `questions.difficulty`. It is
+ * applied to both the count and the page query, and it is not indexed on its own:
+ * a difficulty filter is always combined with either a category or a text match,
+ * and the planner still reaches the rows through `idx_questions_category_id` or
+ * the FTS index. A filter that would scan the whole table would need its own
+ * index, which is not warranted at this corpus size.
  */
-export async function searchQuestions(db, term, { limit = 10, offset = 0 } = {}) {
+export async function searchQuestions(
+  db,
+  term,
+  { limit = 10, offset = 0, difficulty = null } = {},
+) {
   const match = buildMatchQuery(term);
   if (match === null) return { items: [], total: 0 };
 
   const all = (sql, params) => wrap((cb) => db.all(sql, params, cb));
+  const filter = difficultyFilter(difficulty);
+  const count = totalSql(filter);
+  const page = pageIdsSql(filter);
+  // Bind order has to match the order the placeholders appear in each statement:
+  // the two MATCH expressions come first, then the filter, then LIMIT/OFFSET.
+  const filterParam = difficulty ? [difficulty] : [];
 
   let expression = match;
-  let countRows = await all(TOTAL_SQL, [expression, expression]);
+  let countRows = await all(count, [expression, expression, ...filterParam]);
 
   if (countRows[0].count === 0 && expression.includes(" AND ")) {
     expression = expression.replaceAll(" AND ", " OR ");
-    countRows = await all(TOTAL_SQL, [expression, expression]);
+    countRows = await all(count, [expression, expression, ...filterParam]);
   }
 
   const total = countRows[0].count;
@@ -163,7 +202,13 @@ export async function searchQuestions(db, term, { limit = 10, offset = 0 } = {})
 
   // Paginate on questions, then hydrate them. Applying LIMIT to the joined rows
   // instead would let a question's answer count consume the page budget.
-  const idRows = await all(PAGE_IDS_SQL, [expression, expression, limit, offset]);
+  const idRows = await all(page, [
+    expression,
+    expression,
+    ...filterParam,
+    limit,
+    offset,
+  ]);
 
   // A page past the end has no ids, but `total` still describes the result set.
   // Reporting 0 here would make the client show "no results" and hide its

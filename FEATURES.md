@@ -1,6 +1,6 @@
 # Features
 
-Every feature below is implemented in the code and covered by the test suites (52 API tests, 45 component and hook tests). Each section cites the file that implements it.
+Every feature below is implemented in the code and covered by the test suites (72 API tests, 63 component and hook tests). Each section cites the file that implements it.
 
 ## Study mode
 
@@ -35,13 +35,19 @@ Docker & DevOps and Databases & SQL are new. System Design, Testing & Security a
 }
 ```
 
-`total` counts every matching question, not the page, so the client can render "page 2 of 12" and a result count without a second request. Page controls sit below the list, are hidden entirely when everything fits on one page, and reappear on the search results too. Selecting a different category or starting a new search returns to page 1, and switching pages collapses any open question.
+`total` counts every matching question, not the page, so the client can render "page 2 of 12" and a result count without a second request. Page controls sit below the list, are hidden entirely when everything fits on one page, and reappear on the search results too. Selecting a different category or difficulty, or starting a new search, returns to page 1, and switching pages collapses any open question.
 
 Pagination is applied to question **ids** before answers are joined in. Applying the limit to the joined rows would count answer rows rather than questions, so a limit of 20 against questions averaging three answers each would return as few as seven, and `total` from a separate `COUNT(*)` would disagree with what arrived. The regression test in `backend/test/api.test.js` creates three questions with three, two and one answers, pages at a limit of 2, and asserts the pages hold two questions then one, do not overlap, and that `total` is 3.
 
 **Expand a question to read its answers** — clicking a question reveals all of its answers. Answers render inside a `<pre>` with `white-space: pre-wrap`, so multi-line and code-oriented content keeps its line breaks without needing a markdown parser. 46 of the 113 questions carry more than one answer; each is shown as a separate block, so alternative answers read as alternatives rather than as one run-on paragraph.
 
 **Difficulty badge** — every question has a `difficulty` of `beginner`, `intermediate` or `advanced`. It is stored as a column on `questions` and rendered as a coloured badge on each card. The three levels are defined once in `frontend/src/constants.ts` along with their labels and colours; the form's dropdown and the card's badge read from the same table, so they cannot drift. Bundled content is 21 beginner / 58 intermediate / 34 advanced. `POST` defaults the field to `intermediate` when it is omitted, and an unrecognised value is stored as `intermediate` rather than verbatim, so the badge always has a label and colour. `PUT` leaves the stored level alone when the key is omitted.
+
+**Filter by difficulty** — a row of toggles under the search box narrows the list to `beginner`, `intermediate` or `advanced`, alongside a "الكل" option for no filter. Re-clicking the active level clears it, so there is no separate reset control to hunt for. The control lives in `frontend/src/components/DifficultyFilter.tsx`, reads the same `DIFFICULTY_LEVELS` / `DIFFICULTY_LABELS` / `DIFFICULTY_COLORS` tables as the badge and the form, and is hidden in manage mode along with the search box.
+
+The filter is applied in SQL, not in the browser, and it reaches both `GET /api/questions` and `GET /api/search` as `?difficulty=`. It is orthogonal to `category` — the two are combined with `AND` in `listQuestions`, so browsing a category and a level narrows both ways — and it stays active during search, where the category is ignored and results span every category. Changing it returns to page 1, because a page number carried over from the unfiltered list would point past the end of the smaller result set.
+
+Two details are deliberate. The filter is applied to **both** the count and the page query, so `total` and `pages` always describe the items actually returned; applying it to only one would either undercount or list items the total does not account for. And an unrecognised value is **ignored rather than coerced**: `?difficulty=expert` returns the unfiltered list instead of silently behaving like `intermediate`. The three levels therefore always partition a category exactly — asserted in `backend/test/api.test.js` by summing them and comparing against the unfiltered total.
 
 **Tags** — every question also carries `tags`, stored as a JSON array in a `tags` column and typed as `string[]` on the client. They are English kebab-case, 2 to 3 per question in the bundled content, drawn from 124 distinct values such as `service-container`, `dependency-injection` and `caching`. Tags render as a `#tag` row under the question, beside the difficulty badge. A question with no tags renders the badge without any tag chips, which is what `POST` produces when the field is omitted. In the manage form, tags are typed as a comma-separated list and split on submit. The API trims, lowercases, converts internal whitespace to hyphens, de-duplicates and caps the list at 6 tags of 40 characters each, so what is stored matches what the seed file holds.
 
@@ -53,14 +59,14 @@ Pagination is applied to question **ids** before answers are joined in. Applying
 
 - *Loading* — a full-screen "جاري التحميل..." shown until the categories arrive, then an inline spinner for question refreshes. The loading screen is held back while the active category is still unknown, because that category decides which questions to ask for.
 - *Error* — a dismissible banner with a retry button, shown when the API is unreachable or a save fails. The API's error message is surfaced when it provides one; the banner is used for failures from questions, categories, stats and form saves alike.
-- *Empty* — "لا توجد نتائج" when a category has no questions or a search matches nothing.
+- *Empty* — "لا توجد نتائج" when a category has no questions, the difficulty filter matches nothing, or a search matches nothing.
 - *Pending search* — "جاري البحث..." is shown while the typed term is still debouncing or its request is in flight, because the previous result total says nothing about the new query.
 
 **Right-to-left layout** — `direction: "rtl"` is set on the app root, text aligns right, answer blocks are bordered on the right edge to match reading direction, and the pagination controls are mirrored: "previous" sits on the right and points right, "next" sits on the left. Typography uses the Tajawal Arabic web font.
 
 ## Full-text search
 
-`GET /api/search?q=<term>&page=&limit=`, implemented in `backend/src/search.js` and `backend/src/server.js`.
+`GET /api/search?q=<term>&difficulty=&page=&limit=`, implemented in `backend/src/search.js` and `backend/src/server.js`.
 
 **What is searched** — both question text and answer text, across all categories at once. The category tabs are hidden while searching and each result carries a badge naming its category, because a search result can come from anywhere.
 
@@ -122,11 +128,11 @@ Base URL `http://localhost:3000`. All request and response bodies are JSON. 15 r
 | `POST`   | `/api/categories`          | Create a category — `201`                                            |
 | `PUT`    | `/api/categories/:id`      | Update a category's label, icon and colour                           |
 | `DELETE` | `/api/categories/:id`      | Delete a category, cascading to its questions and answers            |
-| `GET`    | `/api/questions`           | One page of questions with nested answers; `?category=` `?page=` `?limit=` |
+| `GET`    | `/api/questions`           | One page of questions with nested answers; `?category=` `?difficulty=` `?page=` `?limit=` |
 | `POST`   | `/api/questions`           | Create a question with answers, difficulty and tags — `201`           |
 | `PUT`    | `/api/questions/:id`       | Update a question; replaces its answers when `answers` is supplied   |
 | `DELETE` | `/api/questions/:id`       | Delete a question, cascading to its answers                          |
-| `GET`    | `/api/search`              | Full-text search; `?q=` `?page=` `?limit=`                           |
+| `GET`    | `/api/search`              | Full-text search across all categories; `?q=` `?difficulty=` `?page=` `?limit=` |
 | `GET`    | `/api/answers/:questionId` | List answers for one question                                        |
 | `PUT`    | `/api/answers/:id`         | Update a single answer                                               |
 | `DELETE` | `/api/answers/:id`         | Delete a single answer                                               |

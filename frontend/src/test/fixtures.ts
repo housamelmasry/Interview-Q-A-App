@@ -208,6 +208,20 @@ const nextQuestionId = (state: ApiState) =>
 const categoryOf = (state: ApiState, id: string) =>
   state.categories.find((category) => category.id === id);
 
+/**
+ * Applies the `difficulty` filter the way the API does: an exact match, and an
+ * unrecognised value is ignored rather than treated as a level. Without this the
+ * mock would return unfiltered rows for a filtered request and the tests would
+ * pass against a client that never sent the parameter.
+ */
+const filterByDifficulty = (source: Question[], query: URLSearchParams): Question[] => {
+  const difficulty = query.get("difficulty");
+  if (!difficulty) return source;
+  const known = ["beginner", "intermediate", "advanced"];
+  if (!known.includes(difficulty)) return source;
+  return source.filter((question) => question.difficulty === difficulty);
+};
+
 const handle = (call: ApiCall, state: ApiState, options: MockApiOptions): MockResponse => {
   const { path, method, query, body } = call;
 
@@ -232,15 +246,16 @@ const handle = (call: ApiCall, state: ApiState, options: MockApiOptions): MockRe
   if (method === "GET" && path === "/api/questions") {
     const { page, limit } = readPage(query);
     const category = query.get("category");
-    const filtered = category
+    const byCategory = category
       ? state.questions.filter((question) => question.category_id === category)
       : state.questions;
-    return json(paginate(filtered, page, limit));
+    return json(paginate(filterByDifficulty(byCategory, query), page, limit));
   }
 
   if (method === "GET" && path === "/api/search") {
     const { page, limit } = readPage(query);
-    return json(paginate(searchMatches(state.questions, query.get("q") ?? ""), page, limit));
+    const matches = searchMatches(state.questions, query.get("q") ?? "");
+    return json(paginate(filterByDifficulty(matches, query), page, limit));
   }
 
   if (method === "POST" && path === "/api/questions") {

@@ -347,6 +347,20 @@
             "example": "laravel-core"
           },
           {
+            "name": "difficulty",
+            "in": "query",
+            "required": false,
+            "description": "Optional exact-match difficulty filter. Accepts beginner, intermediate or advanced; any other value is ignored rather than coerced, so a typo returns the unfiltered list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "beginner",
+                "intermediate",
+                "advanced"
+              ]
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -492,7 +506,7 @@
           "Search"
         ],
         "summary": "Full-text search across questions and answers",
-        "description": "Returns the same paginated envelope as `GET /api/questions`, ordered so that questions whose own text matched rank above questions that matched only through an answer.\n\nSearch runs against SQLite FTS5 over both question text and answer text. Input is sanitised before matching - punctuation is stripped, tokens are quoted so FTS operators are inert, at most 8 tokens are used, and the final token is prefix-matched so results narrow as you type. Multi-word queries are ANDed and fall back to OR when AND yields nothing, which is needed for Arabic definite articles.\n\nA missing, empty or whitespace-only `q` is not an error: the response is 200 with an empty `items` array and `total` 0. Results are not filtered by category.",
+        "description": "Full-text search across question and answer text in every category. The optional difficulty filter narrows the hits and applies to the reported total.\n\nResults are not filtered by category, but the optional `difficulty` filter does apply, and narrows the reported `total` so it always describes the items returned.",
         "parameters": [
           {
             "name": "q",
@@ -503,6 +517,21 @@
               "type": "string"
             },
             "example": "dependency injection"
+          },
+          {
+            "name": "difficulty",
+            "in": "query",
+            "required": false,
+            "description": "Optional exact-match difficulty filter. Accepts beginner, intermediate or advanced; any other value is ignored rather than coerced, so a typo returns the unfiltered list.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "beginner",
+                "intermediate",
+                "advanced"
+              ]
+            },
+            "example": "intermediate"
           },
           {
             "name": "page",

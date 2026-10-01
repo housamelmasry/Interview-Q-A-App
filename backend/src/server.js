@@ -12,6 +12,7 @@ import {
   normaliseAnswers,
   normaliseDifficulty,
   normaliseTags,
+  parseDifficultyFilter,
 } from "./validate.js";
 
 const app = express();
@@ -187,9 +188,11 @@ function readUpdateInput(body) {
 
 app.get("/api/questions", async (req, res) => {
   const pagination = parsePagination(req.query);
+  const difficulty = parseDifficultyFilter(req.query.difficulty);
 
   const { items, total } = await repo.listQuestions({
     category: req.query.category,
+    difficulty,
     limit: pagination.limit,
     offset: (pagination.page - 1) * pagination.limit,
   });
@@ -200,6 +203,7 @@ app.get("/api/questions", async (req, res) => {
 app.get("/api/search", async (req, res) => {
   const { q } = req.query;
   const pagination = parsePagination(req.query);
+  const difficulty = parseDifficultyFilter(req.query.difficulty);
 
   if (!q || !String(q).trim()) {
     return res.json(envelope([], 0, pagination));
@@ -207,6 +211,7 @@ app.get("/api/search", async (req, res) => {
 
   const { items, total } = await repo.searchAllQuestions({
     term: q,
+    difficulty,
     limit: pagination.limit,
     offset: (pagination.page - 1) * pagination.limit,
   });

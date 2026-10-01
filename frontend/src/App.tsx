@@ -8,13 +8,20 @@ import {
   updateCategory,
   updateQuestion,
 } from "./api/client";
-import type { Category, CategoryInput, Question, QuestionInput } from "./api/types";
+import type {
+  Category,
+  CategoryInput,
+  Difficulty,
+  Question,
+  QuestionInput,
+} from "./api/types";
 import { CategoryForm } from "./components/CategoryForm";
 import { CategoryTabs } from "./components/CategoryTabs";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { LoadingScreen } from "./components/LoadingScreen";
+import { DifficultyFilter } from "./components/DifficultyFilter";
 import { ManageToolbar } from "./components/ManageToolbar";
 import { Modal } from "./components/Modal";
 import { Pagination } from "./components/Pagination";
@@ -41,6 +48,7 @@ export default function InterviewGuide() {
 
   // Browse state: the three inputs that decide which page of questions is shown
   const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORY_ID);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
 
@@ -86,6 +94,7 @@ export default function InterviewGuide() {
   const questions = useQuestions({
     category: activeCategory,
     searchTerm: debouncedSearch,
+    difficulty: selectedDifficulty,
     page,
     limit: PAGE_SIZE,
     enabled: activeCategory !== "",
@@ -105,6 +114,15 @@ export default function InterviewGuide() {
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
+    setPage(1);
+    setOpenQuestionId(null);
+  };
+
+  // Narrowing the list changes every match, so the old page number usually
+  // points past the end. Resetting to page 1 is what keeps the visible page
+  // non-empty instead of showing "no results" while results exist.
+  const handleDifficultyChange = (value: Difficulty | null) => {
+    setSelectedDifficulty(value);
     setPage(1);
     setOpenQuestionId(null);
   };
@@ -219,11 +237,18 @@ export default function InterviewGuide() {
         onToggleManageMode={() => setIsManageMode(!isManageMode)}
       >
         {!isManageMode && (
-          <SearchBar
-            theme={theme}
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
+          <>
+            <SearchBar
+              theme={theme}
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+            <DifficultyFilter
+              theme={theme}
+              value={selectedDifficulty}
+              onChange={handleDifficultyChange}
+            />
+          </>
         )}
       </Header>
 

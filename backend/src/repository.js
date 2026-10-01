@@ -111,17 +111,38 @@ export const getStats = async () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns one page of questions, optionally narrowed to a category, alongside
- * the total matching that filter.
+ * Returns one page of questions, optionally narrowed by category and by
+ * difficulty, alongside the total matching that filter.
  *
  * Paging happens on question ids and the answers are attached afterwards.
  * Applying `LIMIT` to the joined rows directly would let a question's answer
  * count consume the page budget, so a page of 20 could return as few as 7
  * questions.
+ *
+ * The predicates are collected into a list and joined rather than hard-coded, so
+ * adding a filter is one push and the count query is derived from the same
+ * fragment as the page query — the two cannot drift, which is what keeps `total`
+ * honest.
  */
-export const listQuestions = async ({ category, limit, offset }) => {
-  const where = category ? "WHERE q.category_id = ?" : "";
-  const params = category ? [category] : [];
+export const listQuestions = async ({
+  category,
+  difficulty = null,
+  limit,
+  offset,
+}) => {
+  const predicates = [];
+  const params = [];
+
+  if (category) {
+    predicates.push("q.category_id = ?");
+    params.push(category);
+  }
+  if (difficulty) {
+    predicates.push("q.difficulty = ?");
+    params.push(difficulty);
+  }
+
+  const where = predicates.length > 0 ? `WHERE ${predicates.join(" AND ")}` : "";
 
   const { count: total } = await get(
     `SELECT COUNT(*) AS count FROM questions q ${where}`,
@@ -146,9 +167,9 @@ export const listQuestions = async ({ category, limit, offset }) => {
   return { items: groupRows(rows), total };
 };
 
-/** Full-text search across question and answer text. */
-export const searchAllQuestions = ({ term, limit, offset }) =>
-  searchQuestions(db, term, { limit, offset });
+/** Full-text search across question and answer text, with the same filters. */
+export const searchAllQuestions = ({ term, difficulty = null, limit, offset }) =>
+  searchQuestions(db, term, { limit, offset, difficulty });
 
 /**
  * Inserts a question and its answers atomically, so a failure on any answer

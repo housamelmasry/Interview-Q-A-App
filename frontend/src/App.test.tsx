@@ -766,3 +766,222 @@ describe("manage mode", () => {
     expect(screen.queryByPlaceholderText(/ابحث/)).not.toBeInTheDocument();
   });
 });
+
+describe("difficulty filter", () => {
+  // Three beginner and two advanced questions in the default category, so a level
+  // can be told apart from "everything". Small enough that the result is a single
+  // page, which keeps the assertions about visible cards independent of the
+  // pagination controls.
+  const mixed = (): Question[] => [
+    makeQuestion(1, { difficulty: "beginner" }),
+    makeQuestion(2, { difficulty: "beginner" }),
+    makeQuestion(3, { difficulty: "beginner" }),
+    makeQuestion(4, { difficulty: "advanced" }),
+    makeQuestion(5, { difficulty: "advanced" }),
+  ];
+
+  const visibleQuestions = () =>
+    within(screen.getByTestId("question-list")).getAllByTestId("question-card");
+
+  it("is offered next to the search box and starts unfiltered", async () => {
+    const { questionCalls } = mockApi({ questions: mixed() });
+    renderApp();
+
+    const filter = await screen.findByTestId("difficulty-filter");
+    expect(within(filter).getByTestId("difficulty-option-all")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(visibleQuestions()).toHaveLength(5);
+    // No parameter is sent while nothing is selected.
+    await waitFor(() => expect(questionCalls()).toHaveLength(1));
+    expect(questionCalls()[0].query.get("difficulty")).toBeNull();
+  });
+
+  it("offers every level plus an all option", async () => {
+    mockApi({ questions: mixed() });
+    renderApp();
+
+    const filter = await screen.findByTestId("difficulty-filter");
+    for (const option of ["all", "beginner", "intermediate", "advanced"]) {
+      expect(within(filter).getByTestId(`difficulty-option-${option}`)).toBeInTheDocument();
+    }
+    expect(within(filter).getByText("الكل")).toBeInTheDocument();
+  });
+
+  it("requests and applies the selected difficulty", async () => {
+    const user = userEvent.setup();
+    const { questionCalls } = mockApi({ questions: mixed() });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+
+    await waitFor(() => expect(questionCalls()).toHaveLength(2));
+    expect(lastCall(questionCalls()).query.get("difficulty")).toBe("advanced");
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(2));
+    expect(screen.getByText("سؤال رقم 4")).toBeInTheDocument();
+    expect(screen.queryByText("سؤال رقم 1")).not.toBeInTheDocument();
+  });
+
+  it("marks the active option for assistive technology", async () => {
+    const user = userEvent.setup();
+    mockApi({ questions: mixed() });
+    renderApp();
+
+    const advanced = await screen.findByTestId("difficulty-option-advanced");
+    expect(advanced).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(advanced);
+    await waitFor(() => expect(advanced).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByTestId("difficulty-option-all")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("clears the filter when the active option is clicked again", async () => {
+    const user = userEvent.setup();
+    const { questionCalls } = mockApi({ questions: mixed() });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+    await user.click(screen.getByTestId("difficulty-option-beginner"));
+    await waitFor(() => expect(questionCalls()).toHaveLength(2));
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(3));
+
+    await user.click(screen.getByTestId("difficulty-option-beginner"));
+
+    await waitFor(() => expect(questionCalls()).toHaveLength(3));
+    expect(lastCall(questionCalls()).query.get("difficulty")).toBeNull();
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+  });
+
+  it("returns to the full list via the الكل option", async () => {
+    const user = userEvent.setup();
+    const { questionCalls } = mockApi({ questions: mixed() });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(2));
+
+    await user.click(screen.getByTestId("difficulty-option-all"));
+
+    await waitFor(() => expect(questionCalls()).toHaveLength(3));
+    expect(lastCall(questionCalls()).query.get("difficulty")).toBeNull();
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+  });
+
+  // Filtering shrinks the result set, so a page number carried over from the
+  // unfiltered list would point past the end and render an empty list.
+  it("returns to page 1 when the filter changes", async () => {
+    const user = userEvent.setup();
+    const paged = [...makeQuestions(12), makeQuestion(13, { difficulty: "advanced" })];
+    const { questionCalls } = mockApi({ questions: paged });
+    renderApp();
+
+    expect(await screen.findByText("سؤال رقم 1")).toBeInTheDocument();
+    await user.click(screen.getByTestId("pagination-next"));
+    await waitFor(() => expect(lastCall(questionCalls()).query.get("page")).toBe("2"));
+
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+
+    await waitFor(() =>
+      expect(lastCall(questionCalls()).query.get("difficulty")).toBe("advanced"),
+    );
+    // Page 2 of 13 would show questions 11-12; the filtered set is one question,
+    // so it only renders at all if the page number was reset.
+    expect(lastCall(questionCalls()).query.get("page")).toBe("1");
+    expect(screen.queryByTestId("pagination")).not.toBeInTheDocument();
+    expect(screen.getByText("سؤال رقم 13")).toBeInTheDocument();
+  });
+
+  it("combines with the category filter", async () => {
+    const user = userEvent.setup();
+    const { questionCalls } = mockApi({
+      questions: [
+        ...mixed(),
+        makeQuestion(6, {
+          category_id: "nodejs",
+          category_label: "Node.js",
+          icon: "🟡",
+          color: "#F7DF1E",
+          difficulty: "advanced",
+        }),
+      ],
+      categories,
+    });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(5));
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(2));
+
+    await user.click(screen.getByTestId("category-tab-nodejs"));
+
+    await waitFor(() => {
+      const query = lastCall(questionCalls()).query;
+      expect(query.get("category")).toBe("nodejs");
+      expect(query.get("difficulty")).toBe("advanced");
+    });
+    // Only the Node.js advanced question is in this category.
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(1));
+    expect(screen.getByText("سؤال رقم 6")).toBeInTheDocument();
+  });
+
+  it("keeps the filter applied while searching", async () => {
+    const user = userEvent.setup();
+    const { searchCalls } = mockApi({
+      questions: [
+        makeQuestion(1, {
+          difficulty: "beginner",
+          question_text: "What is the event loop?",
+        }),
+        makeQuestion(2, {
+          difficulty: "advanced",
+          question_text: "How does the event loop work?",
+        }),
+      ],
+      categories,
+    });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(2));
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(1));
+    expect(searchCalls()).toHaveLength(0);
+
+    await user.type(screen.getByPlaceholderText(/ابحث/), "event loop");
+
+    // The search endpoint spans every category, so the difficulty has to be sent
+    // with it or the filter would quietly stop applying.
+    await waitFor(() => expect(searchCalls()).toHaveLength(1));
+    expect(searchCalls()[0].query.get("difficulty")).toBe("advanced");
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(1));
+    expect(screen.getByText("How does the event loop work?")).toBeInTheDocument();
+    expect(screen.queryByText("What is the event loop?")).not.toBeInTheDocument();
+  });
+
+  it("shows the empty state when nothing matches", async () => {
+    const user = userEvent.setup();
+    mockApi({ questions: [makeQuestion(1, { difficulty: "beginner" })] });
+    renderApp();
+
+    await waitFor(() => expect(visibleQuestions()).toHaveLength(1));
+    await user.click(screen.getByTestId("difficulty-option-advanced"));
+
+    expect(await screen.findByTestId("questions-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("pagination")).not.toBeInTheDocument();
+  });
+
+  it("is hidden in manage mode, like the search box", async () => {
+    const user = userEvent.setup();
+    mockApi({ questions: mixed() });
+    renderApp();
+
+    expect(await screen.findByTestId("difficulty-filter")).toBeInTheDocument();
+    await enterManageMode(user);
+    expect(screen.queryByTestId("difficulty-filter")).not.toBeInTheDocument();
+  });
+});
